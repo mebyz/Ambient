@@ -124,7 +124,7 @@ bit-set = "0.5.3"
 bit-vec = "0.6.3"
 glob = "0.3.0"
 walkdir = "2"
-relative-path = { version = "1.7", features = ["serde"] }
+relative-path = { git = "https://github.com/mebyz/relative-path.git", branch = "windows_sep", features = ["serde"] }
 pin-project = "1.0"
 abort-on-drop = "0.2"
 toml = "0.7.1"
