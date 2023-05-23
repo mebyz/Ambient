@@ -69,7 +69,7 @@ description = "Set the outer radius of a `star` entity"
 attributes = ["Debuggable", "Networked", "Store"]
 
 [components."core::primitives::star_width"]
-type = "U32"
+type = "F32"
 name = "Star width"
 description = "Set the width of a `star` entity, spanning X-plane."
 attributes = ["Debuggable", "Networked", "Store"]
