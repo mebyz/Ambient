@@ -200,5 +200,5 @@ description = "A primitive Star, a type of non-convex polygon."
 "core::primitives::star" = {}
 "core::primitives::star_inner_radius" = 0.25
 "core::primitives::star_outer_radius" = 0.35
-"core::primitives::star_widths" = 5.0
+"core::primitives::star_width" = 5.0
 "core::primitives::star_spikes_number" = 5
