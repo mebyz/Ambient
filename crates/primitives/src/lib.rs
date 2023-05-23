@@ -8,7 +8,7 @@ use ambient_ecs::{components, query, Entity, EntityId, Networked, Store, SystemG
 use ambient_element::{Element, ElementComponent, ElementComponentExt, Hooks};
 pub use ambient_meshes::UVSphereMesh;
 use ambient_meshes::{
-    CapsuleMesh, CapsuleMeshKey, SphereMeshKey, TorusMesh, TorusMeshKey, UnitCubeMeshKey,
+    CapsuleMesh, CapsuleMeshKey, SphereMeshKey, StarMesh, StarMeshKey, TorusMesh, TorusMeshKey, UnitCubeMeshKey,
     UnitQuadMeshKey,
 };
 use ambient_renderer::{
@@ -25,7 +25,8 @@ use glam::{vec3, Mat4, Quat, Vec3, Vec4};
 
 pub use ambient_ecs::generated::components::core::primitives::{
     capsule, capsule_half_height, capsule_latitudes, capsule_longitudes, capsule_radius,
-    capsule_rings, cube, quad, sphere, sphere_radius, sphere_sectors, sphere_stacks, torus,
+    capsule_rings, cube, quad, sphere, sphere_radius, sphere_sectors, sphere_stacks, star,
+    star_inner_radius, star_width, star_outer_radius, star_spikes_number, torus,
     torus_inner_radius, torus_loops, torus_outer_radius, torus_slices,
 };
 
@@ -112,6 +113,36 @@ pub fn torus_data(assets: &AssetCache, torus: &TorusMesh) -> Entity {
     };
     Entity::new()
         .with(mesh(), TorusMeshKey(*torus).get(assets))
+        .with_default(local_to_world())
+        .with_default(mesh_to_world())
+        .with_default(translation())
+        .with(renderer_shader(), cb(get_flat_shader))
+        .with(material(), FlatMaterialKey::white().get(assets))
+        .with(primitives(), vec![])
+        .with_default(gpu_primitives_mesh())
+        .with_default(gpu_primitives_lod())
+        .with(color(), Vec4::ONE)
+        .with(main_scene(), ())
+        .with(local_bounding_aabb(), aabb)
+        .with(world_bounding_aabb(), aabb)
+        .with(world_bounding_sphere(), aabb.to_sphere())
+}
+
+pub fn star_data(assets: &AssetCache, star: &StarMesh) -> Entity {
+    let aabb = AABB {
+        min: vec3(
+            -star.outer_radius - star.inner_radius,
+            -star.outer_radius - star.inner_radius,
+            -star.inner_radius,
+        ),
+        max: vec3(
+            star.outer_radius + star.inner_radius,
+            star.outer_radius + star.inner_radius,
+            star.inner_radius,
+        ),
+    };
+    Entity::new()
+        .with(mesh(), StarMeshKey(*star).get(assets))
         .with_default(local_to_world())
         .with_default(mesh_to_world())
         .with_default(translation())
@@ -239,6 +270,27 @@ pub fn systems() -> SystemGroup {
                         ..Default::default()
                     };
                     let data = torus_data(world.resource(asset_cache()), &mesh);
+                    extend(world, id, data);
+                }
+            }),
+            query((
+                star_inner_radius().changed(),
+                star_outer_radius().changed(),
+                star_width().changed(),
+                star_spikes_number().changed(),
+            ))
+            .incl(torus())
+            .spawned()
+            .to_system(|q, world, qs, _| {
+                for (id, (inner_radius, outer_radius, width, spikes_number)) in q.collect_cloned(world, qs) {
+                    let mesh = StarMesh {
+                        inner_radius,
+                        outer_radius,
+                        width,
+                        spikes_number,
+                        ..Default::default()
+                    };
+                    let data = star_data(world.resource(asset_cache()), &mesh);
                     extend(world, id, data);
                 }
             }),

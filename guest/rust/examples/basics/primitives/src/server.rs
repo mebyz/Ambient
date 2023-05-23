@@ -3,6 +3,7 @@ use ambient_api::{
         app::main_scene,
         camera::aspect_ratio_from_window,
         primitives::{
+            star_inner_radius, star_outer_radius, star_width, star_spikes_number,
             torus_inner_radius, torus_loops, torus_outer_radius, torus_slices,
             capsule_half_height, capsule_latitudes, capsule_longitudes, capsule_radius,
             capsule_rings, cube, quad, sphere_radius, sphere_sectors, sphere_stacks,
@@ -11,7 +12,7 @@ use ambient_api::{
         transform::{lookat_target, scale, translation},
     },
     concepts::{
-        make_torus, make_capsule, make_perspective_infinite_reverse_camera, make_sphere, make_transformable,
+        make_star, make_torus, make_capsule, make_perspective_infinite_reverse_camera, make_sphere, make_transformable,
     },
     prelude::*,
 };
@@ -86,5 +87,49 @@ pub fn main() {
         .with(torus_loops(), 16)
         .with(translation(), vec3(0.0, -2.0, 0.5))
         .with(color(), vec4(0.0, 1.0, 0.25, 1.0))
+        .spawn();
+
+    Entity::new()
+        .with_merge(make_transformable())
+        .with_merge(make_star())
+        .with(star_inner_radius(), 0.25)
+        .with(star_outer_radius(), 0.5)
+        .with(star_spikes_number(), 10)
+        .with(star_width(), 0.1)
+        .with(translation(), vec3(-2.0, -2.0, 0.5))
+        .with(color(), vec4(0.5, 0.5, 0.5, 1.0))
+        .spawn();
+
+    Entity::new()
+        .with_merge(make_transformable())
+        .with_merge(make_star())
+        .with(star_inner_radius(), 0.1)
+        .with(star_outer_radius(), 0.4)
+        .with(star_spikes_number(), 5)
+        .with(star_width(), 0.2)
+        .with(translation(), vec3(2.0, -2.0, 0.5))
+        .with(color(), vec4(0.2, 0.4, 0.8, 1.0))
+        .spawn();
+
+    Entity::new()
+        .with_merge(make_transformable())
+        .with_merge(make_star())
+        .with(star_inner_radius(), 0.2)
+        .with(star_outer_radius(), 0.6)
+        .with(star_spikes_number(), 6)
+        .with(star_width(), 0.3)
+        .with(translation(), vec3(-2.0, 0.0, 0.5))
+        .with(color(), vec4(0.8, 0.6, 0.2, 1.0))
+        .spawn();
+
+    Entity::new()
+        .with_merge(make_transformable())
+        .with_merge(make_star())
+        .with(star_inner_radius(), 0.3)
+        .with(star_outer_radius(), 0.8)
+        .with(star_spikes_number(), 7)
+        .with(star_width(), 0.4)
+        .with(translation(), vec3(0.0, 2.0, 0.5))
+        .with(color(), vec4(0.4, 0.8, 0.2, 1.0))
         .spawn();
 }
