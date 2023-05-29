@@ -397,7 +397,7 @@ fn make_camera() {
         .with_merge(make_perspective_infinite_reverse_camera())
         .with(aspect_ratio_from_window(), EntityId::resources())
         .with_default(main_scene())
-        .with(translation(), vec3(-2.0, -2.0, 6.0))
+        .with(translation(), vec3(-2.0, -2.0, 4.0))
         .with(lookat_target(), vec3(3.0, 3.0, 2.0))
         .spawn();
 }
@@ -440,7 +440,7 @@ fn make_lighting() {
                 entity::set_component(
                     sun_id,
                     rotation(),
-                    Quat::from_rotation_z(frametime()) * sun_rotation,
+                    Quat::from_rotation_z(frametime()/10.0) * sun_rotation,
                 );
             }
         });
@@ -631,9 +631,9 @@ fn register_augmentors() {
     let base_color_map = make_texture(|x, _| {
         let hsl = palette::Hsl::new(360.0 * x, 1.0, 0.5).into_format::<f32>();
         let rgb: palette::LinSrgb = hsl.into_color();
-        let r = 100;//(255.0 * rgb.red/2.0) as u8;
+        let r = 50;//(255.0 * rgb.red/2.0) as u8;
         let g = (255.0 * rgb.green) as u8;
-        let b = 200;//(255.0 * rgb.blue/2.0) as u8;
+        let b = 50;//(255.0 * rgb.blue/2.0) as u8;
         let a = 255;
         [r, g, b, a]
     });
