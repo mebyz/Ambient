@@ -19,7 +19,18 @@ tree_branch_segments = { type = "U32", name = "Tree branch segments", descriptio
 tree_foliage_radius = { type = "F32", name = "Tree foliage radius", description = "The radius of the foliage" }
 tree_foliage_density = { type = "U32", name = "Tree foliage density", description = "The number of foliage" }
 tree_foliage_segments = { type = "U32", name = "Tree foliage segments", description = "The number of segments of the foliage" }
-
+player_head_ref = { type = "EntityId", name = "Player head ref", description = "The player's head.", attributes = [
+    "Debuggable",
+] }
+player_movement_direction = { type = "Vec2", name = "Player movement direction", description = "The player's movement direction.", attributes = [
+    "Debuggable",
+] }
+player_yaw = { type = "F32", name = "Player yaw", description = "The player's yaw.", attributes = [
+    "Debuggable",
+] }
+player_pitch = { type = "F32", name = "Player pitch", description = "The player's pitch.", attributes = [
+    "Debuggable",
+] }
 
 [concepts.tile.components]
 tile_seed = 123
@@ -38,3 +49,9 @@ tree_branch_segments = 3
 tree_foliage_radius = 2.0
 tree_foliage_density = 5
 tree_foliage_segments = 5
+
+[messages.input]
+description = "Describes the input state of the player."
+[messages.input.fields]
+direction = { type = "Vec2", name = "Direction", description = "The movement direction of the player." }
+mouse_delta = { type = "Vec2", name = "Mouse delta", description = "The mouse delta." }

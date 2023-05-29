@@ -981,7 +981,7 @@ fn get_height2(x: i32, y: i32) -> f32 {
 #[main]
 pub async fn main() {
 
-    make_camera();
+    //make_camera();
     make_lighting();
     //make_ground();
 
@@ -993,6 +993,30 @@ pub async fn main() {
         .with_merge(make_transformable())
         .with_default(sky())
         .spawn();
+
+        let mut cursor_lock = input::CursorLockGuard::new(true);
+        ambient_api::messages::Frame::subscribe(move |_| {
+            let input = input::get();
+            if !cursor_lock.auto_unlock_on_escape(&input) {
+                return;
+            }
+
+            let mut displace = Vec2::ZERO;
+            if input.keys.contains(&KeyCode::W) {
+                displace.y -= 1.0;
+            }
+            if input.keys.contains(&KeyCode::S) {
+                displace.y += 1.0;
+            }
+            if input.keys.contains(&KeyCode::A) {
+                displace.x -= 1.0;
+            }
+            if input.keys.contains(&KeyCode::D) {
+                displace.x += 1.0;
+            }
+
+            messages::Input::new(displace, input.mouse_delta).send_server_unreliable();
+        });
 
     // let unit_id = Entity::new()
     //     .with_merge(make_transformable())
