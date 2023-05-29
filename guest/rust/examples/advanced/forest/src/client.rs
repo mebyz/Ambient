@@ -3,13 +3,14 @@ use ambient_api::{
     components::core::{
         camera::aspect_ratio_from_window,
         primitives::quad,
+        prefab::prefab_from_url,
         procedurals::{procedural_material, procedural_mesh},
     },
     concepts::{make_perspective_infinite_reverse_camera, make_transformable},
     mesh::Vertex,
     prelude::*,
 };
-
+use noise::{utils::*, Fbm, Perlin};
 use components::rotating_sun;
 use palette::IntoColor;
 use rand::SeedableRng;
@@ -21,6 +22,12 @@ const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
 const TEXTURE_RESOLUTION_Y: u32 = 4 * RESOLUTION_Y;
 const SIZE_X: f32 = RESOLUTION_X as f32 / RESOLUTION_Y as f32;
 const SIZE_Y: f32 = 1.0;
+use image::{DynamicImage,GenericImageView};
+
+
+const TAU: f32 = std::f32::consts::TAU;
+const WAVE_AMPLITUDE: f32 = 0.25;
+const WAVE_FREQUENCY: f32 = 0.5 * TAU;
 
 #[derive(Clone)]
 pub struct TreeMesh {
@@ -390,8 +397,8 @@ fn make_camera() {
         .with_merge(make_perspective_infinite_reverse_camera())
         .with(aspect_ratio_from_window(), EntityId::resources())
         .with_default(main_scene())
-        .with(translation(), vec3(10.0, 10.0, 4.0) * 2.0)
-        .with(lookat_target(), vec3(0.0, 0.0, 0.0))
+        .with(translation(), vec3(-10.0, -10.0, 5.0))
+        .with(lookat_target(), vec3(70.0, 70.0, 0.0))
         .spawn();
 }
 
@@ -471,6 +478,152 @@ where
     })
 }
 
+struct SimplexNoise {
+    grad3: [[i32; 3]; 12],
+    perm: Vec<i32>,
+    sqrt3: f32,
+}
+
+impl SimplexNoise {
+    fn new() -> SimplexNoise {
+        let grad3: [[i32; 3]; 12] = [
+            [1, 1, 0],
+            [-1, 1, 0],
+            [1, -1, 0],
+            [-1, -1, 0],
+            [1, 0, 1],
+            [-1, 0, 1],
+            [1, 0, -1],
+            [-1, 0, -1],
+            [0, 1, 1],
+            [0, -1, 1],
+            [0, 1, -1],
+            [0, -1, -1],
+        ];
+
+        let p: Vec<i32> = vec![
+            151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30,
+            69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94,
+            252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171,
+            168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60,
+            211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1,
+            216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86,
+            164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118,
+            126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170,
+            213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39,
+            253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228, 251, 34,
+            242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49,
+            192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+            138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180,
+        ];
+
+        let mut perm = vec![0; 512];
+        for i in 0..512 {
+            perm[i] = p[i & 255];
+        }
+
+        SimplexNoise {
+            grad3,
+            perm,
+            sqrt3: f32::sqrt(3.0),
+        }
+    }
+
+    fn floor(&self, n: f32) -> i32 {
+        if n > 0.0 {
+            n as i32
+        } else {
+            (n as i32) - 1
+        }
+    }
+
+    fn dot(&self, g: [i32; 3], x: f32, y: f32) -> f32 {
+        (g[0] as f32) * x + (g[1] as f32) * y
+    }
+
+    fn noise(&self, x: f32, y: f32) -> f32 {
+        let n0: f32;
+        let n1: f32;
+        let n2: f32;
+        let f2: f32 = 0.5 * (self.sqrt3 - 1.0);
+        let s: f32 = (x + y) * f2;
+        let i: i32 = self.floor(x + s);
+        let j: i32 = self.floor(y + s);
+        let g2: f32 = (3.0 - self.sqrt3) / 6.0;
+        let t: f32 = (i + j) as f32 * g2;
+        let x0: f32 = x - (i as f32) + t;
+        let y0: f32 = y - (j as f32) + t;
+        let (i1, j1): (i32, i32);
+        if x0 > y0 {
+            i1 = 1;
+            j1 = 0;
+        } else {
+            i1 = 0;
+            j1 = 1;
+        }
+        let x1: f32 = x0 - (i1 as f32) + g2;
+        let y1: f32 = y0 - (j1 as f32) + g2;
+        let x2: f32 = x0 - 1.0 + 2.0 * g2;
+        let y2: f32 = y0 - 1.0 + 2.0 * g2;
+        let ii: i32 = i & 255;
+        let jj: i32 = j & 255;
+        let gi0: i32 = self.perm[(ii + self.perm[jj as usize]) as usize] % 12;
+        let gi1: i32 = self.perm[(ii + i1 + self.perm[(jj + j1) as usize]) as usize] % 12;
+        let gi2: i32 = self.perm[(ii + 1 + self.perm[(jj + 1) as usize]) as usize] % 12;
+        let t0: f32 = 0.5 - x0 * x0 - y0 * y0;
+        if t0 < 0.0 {
+            n0 = 0.0;
+        } else {
+            let t02: f32 = t0 * t0;
+            n0 = t02 * t02 * self.dot(self.grad3[gi0 as usize], x0, y0);
+        }
+        let t1: f32 = 0.5 - x1 * x1 - y1 * y1;
+        if t1 < 0.0 {
+            n1 = 0.0;
+        } else {
+            let t12: f32 = t1 * t1;
+            n1 = t12 * t12 * self.dot(self.grad3[gi1 as usize], x1, y1);
+        }
+        let t2: f32 = 0.5 - x2 * x2 - y2 * y2;
+        if t2 < 0.0 {
+            n2 = 0.0;
+        } else {
+            let t22: f32 = t2 * t2;
+            n2 = t22 * t22 * self.dot(self.grad3[gi2 as usize], x2, y2);
+        }
+        70.0 * (n0 + n1 + n2)
+    }
+
+    fn harmonic_noise_2d(
+        &self,
+        x: f32,
+        y: f32,
+        harmonics: i32,
+        freq_x: f32,
+        freq_y: f32,
+        smoothness: f32,
+    ) -> f32 {
+        let mut h: f32 = 1.0;
+        let mut sum: f32 = 0.0;
+        for _ in 0..harmonics {
+            sum += self.noise(x * h * freq_x, y * h * freq_y) / smoothness;
+            h *= 2.0;
+        }
+        sum
+    }
+}
+
+fn default_nearest_sampler() -> ProceduralSamplerHandle {
+    sampler::create(&sampler::Descriptor {
+        address_mode_u: sampler::AddressMode::ClampToEdge,
+        address_mode_v: sampler::AddressMode::ClampToEdge,
+        address_mode_w: sampler::AddressMode::ClampToEdge,
+        mag_filter: sampler::FilterMode::Nearest,
+        min_filter: sampler::FilterMode::Nearest,
+        mipmap_filter: sampler::FilterMode::Nearest,
+    })
+}
+
 fn register_augmentors() {
     let mut rng = rand_pcg::Pcg64::seed_from_u64(0);
     let dist_zero_to_255 = rand::distributions::Uniform::new_inclusive(0_u8, 255_u8);
@@ -484,14 +637,47 @@ fn register_augmentors() {
         let a = 255;
         [r, g, b, a]
     });
-    let base_color_map2 = make_texture(|x, _| {
-        let r = 255;
-        let g = 255;
-        let b = 255;
-        let a = dist_zero_to_255.sample(&mut rng);
-        [r, g, b, a]
-    });
+
+let fbm = Fbm::<Perlin>::default();
+let bounds = 2.0;
+let noise_map = PlaneMapBuilder::<_, 2>::new(fbm)
+    .set_size(TEXTURE_RESOLUTION_X as _, TEXTURE_RESOLUTION_Y as _)
+    .set_y_bounds(-bounds * f64::from(SIZE_Y), bounds * f64::from(SIZE_Y))
+    .set_x_bounds(-bounds * f64::from(SIZE_X), bounds * f64::from(SIZE_X))
+    .build();
+let mut noise_iter = noise_map.iter();
+
+
+    let base_color_map2 = make_texture(|x, y| {
+            let hsl = palette::Hsl::new(360.0 * (WAVE_AMPLITUDE * f32::sin(WAVE_FREQUENCY * y)), 1.0, 0.5).into_format::<f32>();
+            let rgb: palette::LinSrgb = hsl.into_color();
+            let r = (255.0 * rgb.red) as u8;
+            let g = (255.0 * rgb.green) as u8;
+            let b = (255.0 * rgb.blue) as u8;
+            let a = 255;
+            [r, g, b, a]
+
+        // let r = dist_zero_to_255.sample(&mut rng);
+        // let g = 255;
+        // let b = 255;
+        // let a = dist_zero_to_255.sample(&mut rng);
+        // [r, g, b, a]
+        ///// let height = (x+y)/1000.0;//get_height2((x*500.0)as i32, (y*500.0) as i32) * 100.0;
+        ///// let gray_u8 = (height) as u8;
+        ///// [255-gray_u8, 255-gray_u8, 255, 255]
+        // let noise = *noise_iter.next().unwrap();
+        // let noise = (255.0 * 0.5 * (noise + 1.0)) as u8;
+        // [noise, noise, noise, 255]
+    }/*|x, y| {
+        let height: f32 = 255.0 - (x+y) as f32;// get_height(x as i32, y as i32) as f32 *10.0; //get_height(x as i32, y as i32) as f32 * 100.0; // 255.0;
+        let gray_u8 = height.clamp(0.0, 255.0) as u8;
+        [gray_u8, gray_u8, gray_u8, 255]
+    }*/);
+
+
+
     let normal_map = make_texture(|_, _| [128, 128, 255, 0]);
+    let normal_map2 = make_texture(|_, _| [255, 128, 255, 0]);
     let metallic_roughness_map = make_texture(|_, _| [255, 255, 0, 0]);
     let sampler = sampler::create(&sampler::Descriptor {
         address_mode_u: sampler::AddressMode::ClampToEdge,
@@ -501,15 +687,16 @@ fn register_augmentors() {
         min_filter: sampler::FilterMode::Nearest,
         mipmap_filter: sampler::FilterMode::Nearest,
     });
-    let material = material::create(&material::Descriptor {
-        base_color_map,
-        normal_map,
-        metallic_roughness_map,
-        sampler,
-        transparent: false,
-    });
+
     let material2 = material::create(&material::Descriptor {
         base_color_map: base_color_map2,
+        normal_map : normal_map2,
+        metallic_roughness_map : metallic_roughness_map,
+        sampler : default_nearest_sampler(),
+        transparent: false,
+    });
+    let material = material::create(&material::Descriptor {
+        base_color_map: base_color_map,
         normal_map,
         metallic_roughness_map,
         sampler,
@@ -582,8 +769,8 @@ fn register_augmentors() {
                 size: Vec2 { x: size, y: size },
                 n_vertices_width: 10,
                 n_vertices_height: 10,
-                uv_min: Vec2 { x: 0.0, y: 0.0 },
-                uv_max: Vec2 { x: 0.0, y: 0.0 },
+                uv_min: Vec2 { x: (tile_x as f32)/5.0, y: (tile_y as f32)/5.0 },
+                uv_max: Vec2 { x: (tile_x as f32 + 1.0)/5.0, y: (tile_y as f32 + 1.0)/5.0},
                 normal: Vec3 {
                     x: 0.0,
                     y: 0.0,
@@ -599,8 +786,12 @@ fn register_augmentors() {
                 id,
                 Entity::new()
                     .with(procedural_mesh(), mesh)
-                    .with(color(), vec4(0.25, 1.0, 0.25, 1.0))
-                    .with(procedural_material(), material)
+                    //.with(color(), vec4(0.25, 1.0, 0.25, 1.0))
+                    .with(procedural_material(), material2)
+                    // .with(
+                    //     pbr_material_from_url(),
+                    //     asset::url("assets/pipeline.json/0/mat.json").unwrap(),
+                    // )
                     .with_default(cast_shadows()),
             );
         }
@@ -608,8 +799,8 @@ fn register_augmentors() {
 }
 
 fn make_trees() {
-    let seed = 12345;
-    let num_trees = 30;
+    let seed = 123456;
+    let num_trees = 100;
 
     // lets plant some trees :)
     for i in 0..num_trees {
@@ -620,8 +811,8 @@ fn make_trees() {
         let branch_angle = gen_rn(seed + i, 10., 12.);
 
         let position = vec3(
-            gen_rn(seed + i, -10.0, 15.0),
-            gen_rn(seed + seed + i, -10.0, 15.0),
+            gen_rn(seed + i, 0.0, 50.0),
+            gen_rn(seed + seed + i, 0.0, 50.0),
             -1.0,
         );
 
@@ -641,19 +832,17 @@ fn make_trees() {
 }
 
 fn make_tiles() {
-    let num_tiles_x = 30;
-    let num_tiles_y = 30;
-    let size = 10.0;
+    let num_tiles_x = 5;
+    let num_tiles_y = 5;
+    let size = 5.0;
     let seed = 123;
 
     for num_tile_x in 0..num_tiles_x {
         for num_tile_y in 0..num_tiles_y {
-            let position = vec3(num_tile_x as f32 * 1.0-20.0, num_tile_y as f32 * 1.0-20.0, 0.001);
 
             let id = Entity::new()
                 .with_merge(concepts::make_tile())
                 .with_merge(make_transformable())
-                .with(translation(), position)
                 .with(components::tile_seed(), seed + num_tile_x + num_tile_y * num_tiles_x)
                 .with(components::tile_size(), size)
                 .with(components::tile_x(), num_tile_x)
@@ -730,7 +919,7 @@ pub fn build_tile(grid: &GridMesh) -> (Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u32>
             positions.push(vec3(
                 grid.top_left.x + grid.size.x * p.x,
                 grid.top_left.y + grid.size.y * p.y,
-                get_height((grid.top_left.x + grid.size.x * p.x) as i32, (grid.top_left.y + grid.size.y * p.y) as i32)
+                get_height2((grid.top_left.x + grid.size.x * p.x) as i32, (grid.top_left.y + grid.size.y * p.y) as i32),
             ));
             texcoords.push(vec2(
                 grid.uv_min.x + (grid.uv_max.x - grid.uv_min.x) * p.x,
@@ -760,16 +949,51 @@ fn get_height(x:i32, y:i32) -> f32 {
     // perlin noise without crate
     let noise = (x.sin() + y.cos()) * 0.5;
     let height = noise * 0.5 + 0.5;
-    height * 2.0
+    height
+}
+fn get_height2(x: i32, y: i32) -> f32 {
+    let simplex = SimplexNoise::new();
+    let mut height: f32 = 0.0;
+    let mut level: f32 = 8.0;
+    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 5.25;
+    // level *= 3.0;
+    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 0.7;
+    // level *= 2.0;
+    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.0;
+    // level *= 2.0;
+    // height -= (f32::cos((x / 2 + 50) as f32 / 40.0) * 2.0)
+    //     + (f32::sin((y / 2 + 110) as f32 / 40.0) * 2.0)
+    //     + 6.0;
+    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.8;
+    // height /= 1.0 + 0.5 + 0.25 + 0.125;
+    //height *= 3.6;
+    height// * 20000.0 + 50.0;
+    //255.0
 }
 
 #[main]
 pub async fn main() {
+
     make_camera();
     make_lighting();
-    make_ground();
+    //make_ground();
 
     register_augmentors();
     make_trees();
     make_tiles();
+
+
+    // let unit_id = Entity::new()
+    //     .with_merge(make_transformable())
+    //     .with(
+    //         prefab_from_url(),
+    //         asset::url("assets/scene.glb").unwrap(),
+    //     )
+    //     .with(color(), vec4(1.0, 0.0, 0.0, 1.0))
+    //     /*.with(
+    //         pbr_material_from_url(),
+    //         asset::url("assets/pipeline.json/0/mat.json").unwrap(),
+    //     )*/
+    //     .with(name(), "974".to_string())
+    //     .spawn();
 }
