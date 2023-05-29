@@ -397,8 +397,8 @@ fn make_camera() {
         .with_merge(make_perspective_infinite_reverse_camera())
         .with(aspect_ratio_from_window(), EntityId::resources())
         .with_default(main_scene())
-        .with(translation(), vec3(-2.0, -2.0, 4.0))
-        .with(lookat_target(), vec3(3.0, 3.0, 2.0))
+        .with(translation(), vec3(0.0, 0.0, 4.0))
+        .with(lookat_target(), vec3(5.0, 5.0, 3.0))
         .spawn();
 }
 
@@ -775,6 +775,8 @@ fn register_augmentors() {
                 id,
                 Entity::new()
                     .with(procedural_mesh(), mesh)
+                    .with(scale(), 2.0 * Vec3::ONE)
+
                     //.with(color(), vec4(0.25, 1.0, 0.25, 1.0))
                     .with(procedural_material(), material2)
                     // .with(
@@ -799,12 +801,12 @@ fn make_trees() {
         let branch_length = gen_rn(seed + i, 0.1, 0.3);
         let branch_angle = gen_rn(seed + i, 10., 12.);
 
-        let x = gen_rn(seed + i, 0.0, 5.0);
-        let y = gen_rn(seed + seed + i, 0.0, 5.0);
+        let x = gen_rn(seed + i, 0.0, 5.0)*2.0;
+        let y = gen_rn(seed + seed + i, 0.0, 5.0)*2.0;
         let position = vec3(
             x,
             y,
-            get_height(x, y),
+            get_height(x, y)*2.0,
         );
 
         let id = Entity::new()
@@ -987,6 +989,10 @@ pub async fn main() {
     make_trees();
     make_tiles();
 
+    Entity::new()
+        .with_merge(make_transformable())
+        .with_default(sky())
+        .spawn();
 
     // let unit_id = Entity::new()
     //     .with_merge(make_transformable())
