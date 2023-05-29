@@ -17,7 +17,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 const RESOLUTION_X: u32 = 32;
-const RESOLUTION_Y: u32 = 8;
+const RESOLUTION_Y: u32 = 32;
 const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
 const TEXTURE_RESOLUTION_Y: u32 = 4 * RESOLUTION_Y;
 const SIZE_X: f32 = RESOLUTION_X as f32 / RESOLUTION_Y as f32;
@@ -397,8 +397,8 @@ fn make_camera() {
         .with_merge(make_perspective_infinite_reverse_camera())
         .with(aspect_ratio_from_window(), EntityId::resources())
         .with_default(main_scene())
-        .with(translation(), vec3(-10.0, -10.0, 5.0))
-        .with(lookat_target(), vec3(70.0, 70.0, 0.0))
+        .with(translation(), vec3(-2.0, -2.0, 6.0))
+        .with(lookat_target(), vec3(3.0, 3.0, 2.0))
         .spawn();
 }
 
@@ -422,8 +422,8 @@ fn make_lighting() {
         .with_default(sun())
         .with(
             rotation(),
-            Quat::from_rotation_y(-45_f32.to_radians())
-                * Quat::from_rotation_z(-45_f32.to_radians()),
+            Quat::from_rotation_y(-90_f32.to_radians())
+                * Quat::from_rotation_z(-90_f32.to_radians()),
         )
         .with(light_diffuse(), Vec3::ONE * 4.0)
         .with_default(main_scene())
@@ -631,49 +631,37 @@ fn register_augmentors() {
     let base_color_map = make_texture(|x, _| {
         let hsl = palette::Hsl::new(360.0 * x, 1.0, 0.5).into_format::<f32>();
         let rgb: palette::LinSrgb = hsl.into_color();
-        let r = (255.0 * rgb.red) as u8;
+        let r = 100;//(255.0 * rgb.red/2.0) as u8;
         let g = (255.0 * rgb.green) as u8;
-        let b = (255.0 * rgb.blue) as u8;
+        let b = 200;//(255.0 * rgb.blue/2.0) as u8;
         let a = 255;
         [r, g, b, a]
     });
 
-let fbm = Fbm::<Perlin>::default();
-let bounds = 2.0;
-let noise_map = PlaneMapBuilder::<_, 2>::new(fbm)
-    .set_size(TEXTURE_RESOLUTION_X as _, TEXTURE_RESOLUTION_Y as _)
-    .set_y_bounds(-bounds * f64::from(SIZE_Y), bounds * f64::from(SIZE_Y))
-    .set_x_bounds(-bounds * f64::from(SIZE_X), bounds * f64::from(SIZE_X))
-    .build();
-let mut noise_iter = noise_map.iter();
-
-
     let base_color_map2 = make_texture(|x, y| {
-            let hsl = palette::Hsl::new(360.0 * (WAVE_AMPLITUDE * f32::sin(WAVE_FREQUENCY * y)), 1.0, 0.5).into_format::<f32>();
-            let rgb: palette::LinSrgb = hsl.into_color();
-            let r = (255.0 * rgb.red) as u8;
-            let g = (255.0 * rgb.green) as u8;
-            let b = (255.0 * rgb.blue) as u8;
-            let a = 255;
+            let mx = x * 10.0;
+            let my = y * 10.0;
+            let mut h = get_height((mx), (my));
+            h = h * 255.0 / 4.0;
+            let r = h as u8 + 100;
+            let g = h as u8 + 50;
+            let b = h as u8;
+            let a = 255 as u8;
             [r, g, b, a]
+    });
 
-        // let r = dist_zero_to_255.sample(&mut rng);
-        // let g = 255;
-        // let b = 255;
-        // let a = dist_zero_to_255.sample(&mut rng);
-        // [r, g, b, a]
-        ///// let height = (x+y)/1000.0;//get_height2((x*500.0)as i32, (y*500.0) as i32) * 100.0;
-        ///// let gray_u8 = (height) as u8;
-        ///// [255-gray_u8, 255-gray_u8, 255, 255]
-        // let noise = *noise_iter.next().unwrap();
-        // let noise = (255.0 * 0.5 * (noise + 1.0)) as u8;
-        // [noise, noise, noise, 255]
-    }/*|x, y| {
-        let height: f32 = 255.0 - (x+y) as f32;// get_height(x as i32, y as i32) as f32 *10.0; //get_height(x as i32, y as i32) as f32 * 100.0; // 255.0;
-        let gray_u8 = height.clamp(0.0, 255.0) as u8;
-        [gray_u8, gray_u8, gray_u8, 255]
-    }*/);
 
+    let metallic_roughness_map2 = make_texture(|x, y| {
+        let mx = x * 10.0;
+        let my = y * 10.0;
+        let mut h = get_height((mx), (my));
+        h = h * 255.0 / 10.0;
+        let r = h as u8;
+        let g = h as u8;
+        let b = h as u8;
+        let a = 255 as u8;
+        [r, g, b, a]
+    });
 
 
     let normal_map = make_texture(|_, _| [128, 128, 255, 0]);
@@ -690,9 +678,9 @@ let mut noise_iter = noise_map.iter();
 
     let material2 = material::create(&material::Descriptor {
         base_color_map: base_color_map2,
-        normal_map : normal_map2,
-        metallic_roughness_map : metallic_roughness_map,
-        sampler : default_nearest_sampler(),
+        normal_map : base_color_map2,
+        metallic_roughness_map : metallic_roughness_map2,
+        sampler,
         transparent: false,
     });
     let material = material::create(&material::Descriptor {
@@ -751,6 +739,7 @@ let mut noise_iter = noise_map.iter();
                 id,
                 Entity::new()
                     .with(procedural_mesh(), mesh)
+                    // green
                     .with(procedural_material(), material)
                     .with_default(cast_shadows()),
             );
@@ -769,8 +758,8 @@ let mut noise_iter = noise_map.iter();
                 size: Vec2 { x: size, y: size },
                 n_vertices_width: 10,
                 n_vertices_height: 10,
-                uv_min: Vec2 { x: (tile_x as f32)/5.0, y: (tile_y as f32)/5.0 },
-                uv_max: Vec2 { x: (tile_x as f32 + 1.0)/5.0, y: (tile_y as f32 + 1.0)/5.0},
+                uv_min: Vec2 { x: (tile_x as f32)*size/5.0, y: (tile_y as f32)*size/5.0},
+                uv_max: Vec2 { x: (tile_x as f32 + 1.0)*size/5.0, y: (tile_y as f32 + 1.0)*size/5.0},
                 normal: Vec3 {
                     x: 0.0,
                     y: 0.0,
@@ -792,7 +781,7 @@ let mut noise_iter = noise_map.iter();
                     //     pbr_material_from_url(),
                     //     asset::url("assets/pipeline.json/0/mat.json").unwrap(),
                     // )
-                    .with_default(cast_shadows()),
+                    //.with_default(cast_shadows()),
             );
         }
     });
@@ -800,7 +789,7 @@ let mut noise_iter = noise_map.iter();
 
 fn make_trees() {
     let seed = 123456;
-    let num_trees = 100;
+    let num_trees = 50;
 
     // lets plant some trees :)
     for i in 0..num_trees {
@@ -810,16 +799,18 @@ fn make_trees() {
         let branch_length = gen_rn(seed + i, 0.1, 0.3);
         let branch_angle = gen_rn(seed + i, 10., 12.);
 
+        let x = gen_rn(seed + i, 0.0, 5.0);
+        let y = gen_rn(seed + seed + i, 0.0, 5.0);
         let position = vec3(
-            gen_rn(seed + i, 0.0, 50.0),
-            gen_rn(seed + seed + i, 0.0, 50.0),
-            -1.0,
+            x,
+            y,
+            get_height(x, y),
         );
 
         let id = Entity::new()
             .with_merge(concepts::make_tree())
             .with_merge(make_transformable())
-            .with(scale(), Vec3::ONE * gen_rn(i, 0.2, 0.4))
+            .with(scale(), Vec3::ONE * gen_rn(i, 0.03, 0.08))
             .with(translation(), position)
             .with(components::tree_seed(), seed + i)
             .with(components::tree_trunk_radius(), trunk_radius)
@@ -834,8 +825,8 @@ fn make_trees() {
 fn make_tiles() {
     let num_tiles_x = 5;
     let num_tiles_y = 5;
-    let size = 5.0;
-    let seed = 123;
+    let size = 1.0;
+    let seed = 123456;
 
     for num_tile_x in 0..num_tiles_x {
         for num_tile_y in 0..num_tiles_y {
@@ -868,8 +859,8 @@ impl Default for GridMesh {
         GridMesh {
             top_left: glam::Vec2::ZERO,
             size: glam::Vec2::ONE,
-            n_vertices_width: 2,
-            n_vertices_height: 2,
+            n_vertices_width: 10,
+            n_vertices_height: 10,
             uv_min: glam::Vec2::ZERO,
             uv_max: glam::Vec2::ONE,
             normal: glam::Vec3::Z,
@@ -913,13 +904,13 @@ pub fn build_tile(grid: &GridMesh) -> (Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u32>
     for y in 0..grid.n_vertices_height {
         for x in 0..grid.n_vertices_width {
             let p = glam::Vec2::new(
-                x as f32 / (grid.n_vertices_width as f32 - 1.0),
-                y as f32 / (grid.n_vertices_height as f32 - 1.0),
+                2.0 * x as f32 / (grid.n_vertices_width as f32 - 1.0),
+                2.0 * y as f32 / (grid.n_vertices_height as f32 - 1.0),
             );
             positions.push(vec3(
                 grid.top_left.x + grid.size.x * p.x,
                 grid.top_left.y + grid.size.y * p.y,
-                get_height2((grid.top_left.x + grid.size.x * p.x) as i32, (grid.top_left.y + grid.size.y * p.y) as i32),
+                get_height((grid.top_left.x + grid.size.x * p.x)*2.0, (grid.top_left.y + grid.size.y * p.y)*2.0),
             ));
             texcoords.push(vec2(
                 grid.uv_min.x + (grid.uv_max.x - grid.uv_min.x) * p.x,
@@ -943,12 +934,26 @@ pub fn build_tile(grid: &GridMesh) -> (Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u32>
     (positions, texcoords, normals, indices)
 }
 
-fn get_height(x:i32, y:i32) -> f32 {
+fn get_height(x:f32, y:f32) -> f32 {
     let x = x as f32;
     let y = y as f32;
     // perlin noise without crate
-    let noise = (x.sin() + y.cos()) * 0.5;
-    let height = noise * 0.5 + 0.5;
+    let noise = (x.sin() * y.cos());
+    let mut height = noise * 0.5 + 0.5;
+
+    let simplex = SimplexNoise::new();
+    let mut level: f32 = 8.0;
+    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5);
+    level *= 3.0;
+    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 0.7;
+    level *= 2.0;
+    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.0;
+    // level *= 2.0;
+    // height -= (f32::cos((x / 2.0 + 50.0) as f32 / 40.0) * 2.0)
+    //     + (f32::sin((y / 2.0 + 110.0) as f32 / 40.0) * 2.0)
+    //     + 6.0;
+    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.8;
+    // height /= 1.0 + 0.5 + 0.25 + 0.125;
     height
 }
 fn get_height2(x: i32, y: i32) -> f32 {
