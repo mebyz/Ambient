@@ -426,7 +426,7 @@ fn make_camera() {
         .with_merge(make_perspective_infinite_reverse_camera())
         .with(aspect_ratio_from_window(), EntityId::resources())
         .with_default(main_scene())
-        .with(translation(), vec3(0.0, 0.0, 4.0))
+        .with(translation(), vec3(0.0, 0.0, 6.0))
         .with(lookat_target(), vec3(5.0, 5.0, 3.0))
         .spawn();
 }
@@ -835,7 +835,7 @@ fn make_trees() {
         let position = vec3(
             x,
             y,
-            get_height(x, y)*2.0,
+            get_height(x, y),
         );
 
         let id = Entity::new()
@@ -849,6 +849,50 @@ fn make_trees() {
             .with(components::tree_trunk_segments(), trunk_segments)
             .with(components::tree_branch_length(), branch_length)
             .with(components::tree_branch_angle(), branch_angle)
+            .with(
+                pbr_material_from_url(),
+                asset::url("assets/pipeline.json/0/mat.json").unwrap(),
+            )
+            .spawn();
+    }
+}
+
+
+fn make_grass() {
+    // different seed for grass so it doesn't overlap with trees
+    let seed = 123457;
+    let num_trees = 500;
+
+    // lets plant some grass :)
+    for i in 0..num_trees {
+        let trunk_radius = gen_rn(seed + i, 0.2, 0.3);
+        let trunk_height = 0.01;//gen_rn(seed + i, 5.0, 7.0);
+        let trunk_segments = 1;//gen_rn(seed + i, 3.0, 5.0) as u32;
+        let branch_length = 1.0;
+        let branch_angle = 1.0;
+
+        let x = gen_rn(seed + i, 0.0, 5.0)*2.0;
+        let y = gen_rn(seed + seed + i, 0.0, 5.0)*2.0;
+        let position = vec3(
+            x,
+            y,
+            get_height(x, y),
+        );
+
+        let id = Entity::new()
+            .with_merge(concepts::make_tree())
+            .with_merge(make_transformable())
+            .with(scale(), Vec3::ONE * gen_rn(i, 0.05, 0.1))
+            .with(translation(), position)
+            .with(components::tree_seed(), seed + i)
+            .with(components::tree_trunk_radius(), trunk_radius)
+            .with(components::tree_trunk_height(), trunk_height)
+            .with(components::tree_trunk_segments(), trunk_segments)
+            .with(components::tree_branch_length(), branch_length)
+            .with(components::tree_branch_angle(), branch_angle)
+            .with(components::tree_foliage_density(), 0)
+            .with(components::tree_foliage_radius(), 0.0)
+            .with(components::tree_foliage_segments(), 0)
             .with(
                 pbr_material_from_url(),
                 asset::url("assets/pipeline.json/0/mat.json").unwrap(),
@@ -991,25 +1035,6 @@ fn get_height(x:f32, y:f32) -> f32 {
     // height /= 1.0 + 0.5 + 0.25 + 0.125;
     height
 }
-fn get_height2(x: i32, y: i32) -> f32 {
-    let simplex = SimplexNoise::new();
-    let mut height: f32 = 0.0;
-    let mut level: f32 = 8.0;
-    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 5.25;
-    // level *= 3.0;
-    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 0.7;
-    // level *= 2.0;
-    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.0;
-    // level *= 2.0;
-    // height -= (f32::cos((x / 2 + 50) as f32 / 40.0) * 2.0)
-    //     + (f32::sin((y / 2 + 110) as f32 / 40.0) * 2.0)
-    //     + 6.0;
-    // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.8;
-    // height /= 1.0 + 0.5 + 0.25 + 0.125;
-    //height *= 3.6;
-    height// * 20000.0 + 50.0;
-    //255.0
-}
 
 #[main]
 pub async fn main() {
@@ -1021,7 +1046,7 @@ pub async fn main() {
     register_augmentors();
     make_trees();
     make_tiles();
-
+    make_grass();
     Entity::new()
         .with_merge(make_transformable())
         .with_default(sky())
