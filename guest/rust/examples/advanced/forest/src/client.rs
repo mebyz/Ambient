@@ -56,6 +56,9 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
     let sectors = 12;
     let trunk_segments = tree.trunk_segments;
     let mut indices = Vec::new();
+    let trunk_vertices_count = (trunk_segments + 1) * (sectors + 1);
+
+    let mut vertices: Vec<Vertex> = Vec::with_capacity(vertices1.len());
 
     // Connect trunk segments
     for i in 0..(trunk_segments) {
@@ -182,32 +185,40 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
         let sector_step = 2. * std::f32::consts::PI / density as f32;
 
         let mut sphere_vertices = Vec::new();
-        let mut sphere_normals = Vec::new();
-        let mut sphere_uvs = Vec::new();
+    let mut sphere_normals = Vec::new();
+    let mut sphere_uvs = Vec::new();
 
-        for i in 0..=segments {
-            let theta = (i as f32 / segments as f32) * std::f32::consts::PI;
-            let height = foliage_position.z + (foliage_radius * theta.cos());
-            let segment_radius = foliage_radius * theta.sin();
+    for i in 0..=segments {
+        let theta = (i as f32 / segments as f32) * std::f32::consts::PI;
+        let height = foliage_position.z + (foliage_radius * theta.cos());
+        let segment_radius = foliage_radius * theta.sin();
 
-            for j in 0..=density {
-                let phi = j as f32 * sector_step;
-                let x = foliage_position.x + segment_radius * phi.cos();
-                let y = foliage_position.y + segment_radius * phi.sin();
-                let z = height;
+        for j in 0..=density {
+            let phi = j as f32 * sector_step;
+            let x = foliage_position.x + segment_radius * phi.cos();
+            let y = foliage_position.y + segment_radius * phi.sin();
+            let z = height;
 
-                sphere_vertices.push(vec3(x, y, z));
-                sphere_normals.push(
-                    vec3(
-                        x - foliage_position.x,
-                        y - foliage_position.y,
-                        z - foliage_position.z,
-                    )
-                    .normalize(),
-                );
-                sphere_uvs.push(vec2(j as f32 / density as f32, i as f32 / segments as f32));
-            }
+            sphere_vertices.push(vec3(x, y, z));
+
+            // Calculate the foliage normal based on the vector from the foliage position to the vertex
+            let normal = vec3(x, y, z) - foliage_position;
+            sphere_normals.push(normal.normalize());
+
+
+            // Calculate the v-coordinate for foliage vertices
+            let v = if i < density {
+                // Map foliage to the upper portion of the texture
+                0.5 + (i as f32 / density as f32) * 0.5
+            } else {
+                // Map trunk to the lower portion of the texture
+                i as f32 / segments as f32
+            };
+
+            // Update the UV coordinate calculation
+            sphere_uvs.push(vec2(j as f32 / density as f32, v));
         }
+    }
 
         let sphere_indices = generate_sphere_indices(segments as usize, density as usize);
 
@@ -281,9 +292,27 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
             position: vec3(px, py, pz) + vec3(-0.5 * SIZE_X, -0.5 * SIZE_Y, 0.0),
             normal: vec3(nx, ny, nz),
             tangent: vec3(1.0, 0.0, 0.0),
-            texcoord0: vec2(u, v),
+            texcoord0: if i < trunk_vertices_count as usize {
+                // Trunk UVs (bottom half of the texture)
+                let u = uvs1[i].x;
+                let v = uvs1[i].y * 0.5;
+                vec2(u, v)
+            } else {
+                // Foliage UVs (upper half of the texture)
+                let u = uvs1[i].x;
+                let v = uvs1[i].y * 0.5 + 0.5;
+                vec2(u, v)
+            },
         };
+
         vertices.push(v);
+        // let v = mesh::Vertex {
+        //     position: vec3(px, py, pz) + vec3(-0.5 * SIZE_X, -0.5 * SIZE_Y, 0.0),
+        //     normal: vec3(nx, ny, nz),
+        //     tangent: vec3(1.0, 0.0, 0.0),
+        //     texcoord0: vec2(u, v),
+        // };
+        // vertices.push(v);
     }
 
     MeshDescriptor { vertices, indices }
@@ -422,10 +451,10 @@ fn make_lighting() {
         .with_default(sun())
         .with(
             rotation(),
-            Quat::from_rotation_y(-90_f32.to_radians())
-                * Quat::from_rotation_z(-90_f32.to_radians()),
+            Quat::from_rotation_y(-45_f32.to_radians())
+                * Quat::from_rotation_z(-45_f32.to_radians()),
         )
-        .with(light_diffuse(), Vec3::ONE * 4.0)
+        .with(light_diffuse(), Vec3::ONE * 10.0)
         .with_default(main_scene())
         .with(rotating_sun(), false)
         .spawn();
@@ -740,7 +769,7 @@ fn register_augmentors() {
                 Entity::new()
                     .with(procedural_mesh(), mesh)
                     // green
-                    .with(procedural_material(), material)
+                    //.with(procedural_material(), material)
                     .with_default(cast_shadows()),
             );
         }
@@ -820,6 +849,10 @@ fn make_trees() {
             .with(components::tree_trunk_segments(), trunk_segments)
             .with(components::tree_branch_length(), branch_length)
             .with(components::tree_branch_angle(), branch_angle)
+            .with(
+                pbr_material_from_url(),
+                asset::url("assets/pipeline.json/0/mat.json").unwrap(),
+            )
             .spawn();
     }
 }
