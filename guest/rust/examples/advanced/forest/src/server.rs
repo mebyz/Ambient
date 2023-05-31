@@ -9,7 +9,7 @@ use ambient_api::{
         },
         player::{player, user_id},
         primitives::{cube, quad},
-        rendering::color,
+        rendering::{color, water, sky},
         transform::{local_to_parent, rotation, scale, translation},
     },
     concepts::{make_perspective_infinite_reverse_camera, make_sphere, make_transformable},
@@ -24,17 +24,36 @@ pub fn main() {
     Entity::new()
         .with_merge(make_transformable())
         .with_default(quad())
-        .with(scale(), Vec3::ONE * 10.)
-        .with(color(), vec4(1., 0., 0., 1.))
+        .with(scale(), Vec3::ONE * 0.)
+        .with(color(), vec4(0., 0., 1., 1.))
         .with_default(plane_collider())
         .spawn();
 
-    Entity::new()
+    // Entity::new()
+    //     .with_merge(make_transformable())
+    //     .with_merge(make_sphere())
+    //     .with(sphere_collider(), 0.01)
+    //     .with(translation(), vec3(5., 5., 1.))
+    //     .spawn();
+
+        Entity::new()
         .with_merge(make_transformable())
-        .with_merge(make_sphere())
-        .with(sphere_collider(), 0.5)
-        .with(translation(), vec3(5., 5., 1.))
+        .with_default(water())
+        .with(scale(), Vec3::ONE * 10.)
         .spawn();
+
+    Entity::new()
+    .with_merge(make_transformable())
+    .with_default(sky())
+    .with(fog_density(), 1.0)
+    .spawn();
+
+    // Entity::new()
+    //     .with_merge(make_transformable())
+    //     .with_merge(make_sphere())
+    //     .with(sphere_collider(), 0.5)
+    //     .with(translation(), vec3(5., 5., 1.))
+    //     .spawn();
 
     spawn_query((player(), user_id())).bind(move |players| {
         for (id, (_, uid)) in players {

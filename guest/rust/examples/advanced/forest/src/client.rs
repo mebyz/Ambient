@@ -165,24 +165,33 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
     }
 
     // Generate foliage
-    let foliage_count = tree.foliage_density + tree.foliage_segments;
-    let foliage_radius_variance = 0.05;
-    let foliage_position_variance = vec3(3.0, 3.0, 3.0);
-
+    let mut foliage_count = tree.foliage_density + tree.foliage_segments;
+    let mut foliage_radius_variance = 0.05;
+    let mut foliage_position_variance = vec3(3.0, 3.0, 3.0);
+    if tree.foliage_radius < 1.0
+    {
+//        foliage_count = 2;
+//        foliage_radius_variance = 0.1;
+        foliage_position_variance = vec3(0.1, 0.1, 0.1);
+    }
     for i in 0..foliage_count {
         let foliage_radius = tree.foliage_radius
             * (1.0 - gen_rn(tree.seed + i as i32, 0.0, 1.0) * foliage_radius_variance);
+        let mut position_shift_z = 2.0;
+        if foliage_radius < 1.0 {
+            position_shift_z = 0.0;
+        }
         let foliage_position = top_vertices1
             [gen_rn(tree.seed, 0.0, top_vertices1.len() as f32) as usize]
             + vec3(
                 gen_rn(tree.seed + i as i32, -1.0, 1.0) * foliage_position_variance.x,
                 gen_rn(tree.seed + i as i32 + 1, -1.0, 1.0) * foliage_position_variance.y,
-                gen_rn(tree.seed + i as i32 + 2, 0.0, 1.0) * foliage_position_variance.z + 2.0,
+                gen_rn(tree.seed + i as i32 + 2, 0.0, 1.0) * foliage_position_variance.z + position_shift_z,
             );
 
         let segments = tree.foliage_segments;
         let density = tree.foliage_density;
-        let sector_step = 2. * std::f32::consts::PI / density as f32;
+        let sector_step = 2. * std::f32::consts::PI / segments as f32;
 
         let mut sphere_vertices = Vec::new();
     let mut sphere_normals = Vec::new();
@@ -193,7 +202,7 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
         let height = foliage_position.z + (foliage_radius * theta.cos());
         let segment_radius = foliage_radius * theta.sin();
 
-        for j in 0..=density {
+        for j in 0..=segments {
             let phi = j as f32 * sector_step;
             let x = foliage_position.x + segment_radius * phi.cos();
             let y = foliage_position.y + segment_radius * phi.sin();
@@ -207,20 +216,20 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
 
 
             // Calculate the v-coordinate for foliage vertices
-            let v = if i < density {
+            let v = if i < segments {
                 // Map foliage to the upper portion of the texture
-                0.5 + (i as f32 / density as f32) * 0.5
+                0.5 + (i as f32 / segments as f32) * 0.5
             } else {
                 // Map trunk to the lower portion of the texture
                 i as f32 / segments as f32
             };
 
             // Update the UV coordinate calculation
-            sphere_uvs.push(vec2(j as f32 / density as f32, v));
+            sphere_uvs.push(vec2(j as f32 / segments as f32, v));
         }
     }
 
-        let sphere_indices = generate_sphere_indices(segments as usize, density as usize);
+        let sphere_indices = generate_sphere_indices(segments as usize, segments as usize);
 
         vertices1.extend(sphere_vertices.clone());
         normals1.extend(sphere_normals);
@@ -451,10 +460,10 @@ fn make_lighting() {
         .with_default(sun())
         .with(
             rotation(),
-            Quat::from_rotation_y(-45_f32.to_radians())
-                * Quat::from_rotation_z(-45_f32.to_radians()),
+            Quat::from_rotation_y(-90_f32.to_radians())
+                * Quat::from_rotation_z(-90_f32.to_radians()),
         )
-        .with(light_diffuse(), Vec3::ONE * 10.0)
+        .with(light_diffuse(), Vec3::ONE * 3.0)
         .with_default(main_scene())
         .with(rotating_sun(), false)
         .spawn();
@@ -473,16 +482,6 @@ fn make_lighting() {
                 );
             }
         });
-}
-
-fn make_ground() {
-    Entity::new()
-        .with_merge(make_transformable())
-        .with_default(quad())
-        .with(color(), vec4(0.25, 1.0, 0.25, 1.0))
-        .with(translation(), vec3(0.0, 0.0, -0.5))
-        .with(scale(), 32.0 * Vec3::ONE)
-        .spawn();
 }
 
 fn make_texture<PixelFn>(mut pixel_fn: PixelFn) -> ProceduralTextureHandle
@@ -817,31 +816,58 @@ fn register_augmentors() {
         }
     });
 }
+fn make_vegetation(vegetation_type: &str) {
+    let (seed, num_vegetation) = match vegetation_type {
+        "trees" => (123456, 50),
+        "bush" => (123457, 100),
+        "mushrooms" => (123458, 50),
+        _ => panic!("Invalid vegetation type"),
+    };
 
-fn make_trees() {
-    let seed = 123456;
-    let num_trees = 50;
+    for i in 0..num_vegetation {
+        let (trunk_radius, trunk_height, trunk_segments, branch_length, branch_angle, foliage_density, foliage_radius, foliage_segments) =
+            match vegetation_type {
+                "trees" => (
+                    gen_rn(seed + i, 2.0, 3.0),
+                    gen_rn(seed + i, 15.0, 20.0),
+                    gen_rn(seed + i, 6.0, 12.0) as u32,
+                    gen_rn(seed + i, 0.1, 0.3),
+                    gen_rn(seed + i, 10.0, 12.0),
+                    5,
+                    2.0,
+                    5,
+                ),
+                "bush" => (
+                    gen_rn(seed + i, 0.2, 0.3),
+                    0.01,
+                    1,
+                    1.0,
+                    1.0,
+                    0,
+                    0.0,
+                    0,
+                ),
+                "mushrooms" => (
+                    1.0,
+                    2.0,
+                    2,
+                    0.01,
+                    0.01,
+                    1,
+                    0.9,
+                    5,
+                ),
+                _ => panic!("Invalid vegetation type"),
+            };
 
-    // lets plant some trees :)
-    for i in 0..num_trees {
-        let trunk_radius = gen_rn(seed + i, 2.0, 3.0);
-        let trunk_height = gen_rn(seed + i, 15.0, 20.0);
-        let trunk_segments = gen_rn(seed + i, 6.0, 12.0) as u32;
-        let branch_length = gen_rn(seed + i, 0.1, 0.3);
-        let branch_angle = gen_rn(seed + i, 10., 12.);
-
-        let x = gen_rn(seed + i, 0.0, 5.0)*2.0;
-        let y = gen_rn(seed + seed + i, 0.0, 5.0)*2.0;
-        let position = vec3(
-            x,
-            y,
-            get_height(x, y),
-        );
+        let x = gen_rn(seed + i, 0.0, 5.0) * 2.0;
+        let y = gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
+        let position = vec3(x, y, get_height(x, y)*2.0)+0.2;
 
         let id = Entity::new()
             .with_merge(concepts::make_tree())
             .with_merge(make_transformable())
-            .with(scale(), Vec3::ONE * gen_rn(i, 0.03, 0.08))
+            .with(scale(), Vec3::ONE * gen_rn(i, if vegetation_type == "trees" { 0.03 } else { 0.05 }, if vegetation_type == "trees" { 0.08 } else { 0.1 }))
             .with(translation(), position)
             .with(components::tree_seed(), seed + i)
             .with(components::tree_trunk_radius(), trunk_radius)
@@ -849,53 +875,12 @@ fn make_trees() {
             .with(components::tree_trunk_segments(), trunk_segments)
             .with(components::tree_branch_length(), branch_length)
             .with(components::tree_branch_angle(), branch_angle)
+            .with(components::tree_foliage_density(), foliage_density)
+            .with(components::tree_foliage_radius(), foliage_radius)
+            .with(components::tree_foliage_segments(), foliage_segments)
             .with(
                 pbr_material_from_url(),
-                asset::url("assets/pipeline.json/0/mat.json").unwrap(),
-            )
-            .spawn();
-    }
-}
-
-
-fn make_grass() {
-    // different seed for grass so it doesn't overlap with trees
-    let seed = 123457;
-    let num_trees = 500;
-
-    // lets plant some grass :)
-    for i in 0..num_trees {
-        let trunk_radius = gen_rn(seed + i, 0.2, 0.3);
-        let trunk_height = 0.01;//gen_rn(seed + i, 5.0, 7.0);
-        let trunk_segments = 1;//gen_rn(seed + i, 3.0, 5.0) as u32;
-        let branch_length = 1.0;
-        let branch_angle = 1.0;
-
-        let x = gen_rn(seed + i, 0.0, 5.0)*2.0;
-        let y = gen_rn(seed + seed + i, 0.0, 5.0)*2.0;
-        let position = vec3(
-            x,
-            y,
-            get_height(x, y),
-        );
-
-        let id = Entity::new()
-            .with_merge(concepts::make_tree())
-            .with_merge(make_transformable())
-            .with(scale(), Vec3::ONE * gen_rn(i, 0.05, 0.1))
-            .with(translation(), position)
-            .with(components::tree_seed(), seed + i)
-            .with(components::tree_trunk_radius(), trunk_radius)
-            .with(components::tree_trunk_height(), trunk_height)
-            .with(components::tree_trunk_segments(), trunk_segments)
-            .with(components::tree_branch_length(), branch_length)
-            .with(components::tree_branch_angle(), branch_angle)
-            .with(components::tree_foliage_density(), 0)
-            .with(components::tree_foliage_radius(), 0.0)
-            .with(components::tree_foliage_segments(), 0)
-            .with(
-                pbr_material_from_url(),
-                asset::url("assets/pipeline.json/0/mat.json").unwrap(),
+                if vegetation_type == "mushrooms" { asset::url("assets/pipeline.json/1/mat.json").unwrap() } else { asset::url("assets/pipeline.json/0/mat.json").unwrap() },
             )
             .spawn();
     }
@@ -949,7 +934,7 @@ impl Default for GridMesh {
 
 pub fn create_tile(grid: GridMesh) -> MeshDescriptor {
     // Create the tile
-    let (mut vertices1, mut uvs1, mut normals1, mut indices) = build_tile(&grid);
+    let (vertices1, uvs1, normals1, indices) = build_tile(&grid);
 
     let mut vertices: Vec<Vertex> = Vec::with_capacity(vertices1.len());
 
@@ -1033,6 +1018,7 @@ fn get_height(x:f32, y:f32) -> f32 {
     //     + 6.0;
     // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.8;
     // height /= 1.0 + 0.5 + 0.25 + 0.125;
+    height = (f32::cos(x)+f32::sin(y))/5.0;
     height
 }
 
@@ -1044,13 +1030,11 @@ pub async fn main() {
     //make_ground();
 
     register_augmentors();
-    make_trees();
     make_tiles();
-    make_grass();
-    Entity::new()
-        .with_merge(make_transformable())
-        .with_default(sky())
-        .spawn();
+    make_vegetation("trees");
+    make_vegetation("bush");
+    make_vegetation("mushrooms");
+
 
         let mut cursor_lock = input::CursorLockGuard::new(true);
         ambient_api::messages::Frame::subscribe(move |_| {
