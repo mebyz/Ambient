@@ -111,7 +111,7 @@ pub fn main() {
         for (player_id, (_, direction, rot)) in players {
             let speed = 0.1;
 
-            let displace = rot * (direction.normalize_or_zero() * speed).extend(-0.1);
+            let displace = rot * (direction.normalize_or_zero() * speed);
             physics::move_character(player_id, displace, 0.01, frametime());
         }
     });

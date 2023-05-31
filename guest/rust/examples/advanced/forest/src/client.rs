@@ -370,6 +370,7 @@ fn make_tiles() {
 
 #[main]
 pub async fn main() {
+    let mut last_player_position = vec3(0.0, 0.0, 0.0);
 
     make_lighting();
 
@@ -386,7 +387,7 @@ pub async fn main() {
             return;
         }
 
-        let mut displace = Vec2::ZERO;
+        let mut displace = Vec3::ZERO;
         if input.keys.contains(&KeyCode::W) {
             displace.y -= 1.0;
         }
@@ -399,6 +400,23 @@ pub async fn main() {
         if input.keys.contains(&KeyCode::D) {
             displace.x += 1.0;
         }
+
+        let mut player_position = last_player_position;
+
+        player_position.z = tooling::get_height(
+            player_position.x,
+            player_position.y,
+        );
+
+        displace.z = player_position.z - last_player_position.z;
+
+        player_position.x += displace.x * 0.1;
+        player_position.y += displace.y * 0.1;
+
+        last_player_position = player_position;
+
+        // println("player_position", player_position);
+        // println("displace", displace);
 
         messages::Input::new(displace, input.mouse_delta).send_server_unreliable();
     });
