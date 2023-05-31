@@ -2,15 +2,13 @@ use ambient_api::{
     client::{material, mesh, sampler, texture},
     components::core::{
         camera::aspect_ratio_from_window,
-        primitives::quad,
-        prefab::prefab_from_url,
         procedurals::{procedural_material, procedural_mesh},
     },
     concepts::{make_perspective_infinite_reverse_camera, make_transformable},
     mesh::Vertex,
     prelude::*,
 };
-use noise::{utils::*, Fbm, Perlin};
+use noise::{utils::*};
 use components::rotating_sun;
 use palette::IntoColor;
 use rand::SeedableRng;
@@ -22,7 +20,7 @@ const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
 const TEXTURE_RESOLUTION_Y: u32 = 4 * RESOLUTION_Y;
 const SIZE_X: f32 = RESOLUTION_X as f32 / RESOLUTION_Y as f32;
 const SIZE_Y: f32 = 1.0;
-use image::{DynamicImage,GenericImageView};
+
 
 
 const TAU: f32 = std::f32::consts::TAU;
@@ -50,7 +48,7 @@ pub struct MeshDescriptor {
 
 pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
     // Create the trunk
-    let (mut vertices1, top_vertices1, mut normals1, mut uvs1, trunk_direction) =
+    let (mut vertices1, top_vertices1, mut normals1, mut uvs1, _trunk_direction) =
         build_trunk(&tree);
 
     let sectors = 12;
@@ -58,7 +56,7 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
     let mut indices = Vec::new();
     let trunk_vertices_count = (trunk_segments + 1) * (sectors + 1);
 
-    let mut vertices: Vec<Vertex> = Vec::with_capacity(vertices1.len());
+    let _vertices: Vec<Vertex> = Vec::with_capacity(vertices1.len());
 
     // Connect trunk segments
     for i in 0..(trunk_segments) {
@@ -78,7 +76,7 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
 
     // Generate branches
     let branch_count = tree.branch_segments;
-    let branch_radius_variance = 0.02;
+    let _branch_radius_variance = 0.02;
     let branch_position_variance = vec3(0.8, 0.8, 0.7);
 
     let mut rng = ChaCha8Rng::seed_from_u64(tree.seed as u64);
@@ -165,8 +163,8 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
     }
 
     // Generate foliage
-    let mut foliage_count = tree.foliage_density + tree.foliage_segments;
-    let mut foliage_radius_variance = 0.05;
+    let foliage_count = tree.foliage_density + tree.foliage_segments;
+    let foliage_radius_variance = 0.05;
     let mut foliage_position_variance = vec3(3.0, 3.0, 3.0);
     if tree.foliage_radius < 1.0
     {
@@ -190,7 +188,7 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
             );
 
         let segments = tree.foliage_segments;
-        let density = tree.foliage_density;
+        let _density = tree.foliage_density;
         let sector_step = 2. * std::f32::consts::PI / segments as f32;
 
         let mut sphere_vertices = Vec::new();
@@ -291,8 +289,8 @@ pub fn create_tree(tree: TreeMesh) -> MeshDescriptor {
         let px = vertices1[i].x;
         let py = vertices1[i].y;
         let pz = vertices1[i].z;
-        let u = uvs1[i].x;
-        let v = uvs1[i].y;
+        let _u = uvs1[i].x;
+        let _v = uvs1[i].y;
         let nx = normals1[i].x;
         let ny = normals1[i].y;
         let nz = normals1[i].z;
@@ -653,8 +651,8 @@ fn default_nearest_sampler() -> ProceduralSamplerHandle {
 }
 
 fn register_augmentors() {
-    let mut rng = rand_pcg::Pcg64::seed_from_u64(0);
-    let dist_zero_to_255 = rand::distributions::Uniform::new_inclusive(0_u8, 255_u8);
+    let _rng = rand_pcg::Pcg64::seed_from_u64(0);
+    let _dist_zero_to_255 = rand::distributions::Uniform::new_inclusive(0_u8, 255_u8);
 
     let base_color_map = make_texture(|x, _| {
         let hsl = palette::Hsl::new(360.0 * x, 1.0, 0.5).into_format::<f32>();
@@ -669,7 +667,7 @@ fn register_augmentors() {
     let base_color_map2 = make_texture(|x, y| {
             let mx = x * 10.0;
             let my = y * 10.0;
-            let mut h = get_height((mx), (my));
+            let mut h = get_height(mx, my);
             h = h * 255.0 / 4.0;
             let r = h as u8 + 100;
             let g = h as u8 + 50;
@@ -682,7 +680,7 @@ fn register_augmentors() {
     let metallic_roughness_map2 = make_texture(|x, y| {
         let mx = x * 10.0;
         let my = y * 10.0;
-        let mut h = get_height((mx), (my));
+        let mut h = get_height(mx, my);
         h = h * 255.0 / 10.0;
         let r = h as u8;
         let g = h as u8;
@@ -693,7 +691,7 @@ fn register_augmentors() {
 
 
     let normal_map = make_texture(|_, _| [128, 128, 255, 0]);
-    let normal_map2 = make_texture(|_, _| [255, 128, 255, 0]);
+    let _normal_map2 = make_texture(|_, _| [255, 128, 255, 0]);
     let metallic_roughness_map = make_texture(|_, _| [255, 255, 0, 0]);
     let sampler = sampler::create(&sampler::Descriptor {
         address_mode_u: sampler::AddressMode::ClampToEdge,
@@ -711,7 +709,7 @@ fn register_augmentors() {
         sampler,
         transparent: false,
     });
-    let material = material::create(&material::Descriptor {
+    let _material = material::create(&material::Descriptor {
         base_color_map: base_color_map,
         normal_map,
         metallic_roughness_map,
@@ -780,7 +778,7 @@ fn register_augmentors() {
         components::tile_x(),
         components::tile_y(),
     )).bind(move |tiles| {
-        for (id, (seed, size, tile_x, tile_y)) in tiles {
+        for (id, (_seed, size, tile_x, tile_y)) in tiles {
             let tile = create_tile(GridMesh {
                 top_left: Vec2 { x: tile_x as f32 * size, y: tile_y as f32 * size},
                 size: Vec2 { x: size, y: size },
@@ -864,7 +862,7 @@ fn make_vegetation(vegetation_type: &str) {
         let y = gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
         let position = vec3(x, y, get_height(x, y)*2.0)+0.2;
 
-        let id = Entity::new()
+        let _id = Entity::new()
             .with_merge(concepts::make_tree())
             .with_merge(make_transformable())
             .with(scale(), Vec3::ONE * gen_rn(i, if vegetation_type == "trees" { 0.03 } else { 0.05 }, if vegetation_type == "trees" { 0.08 } else { 0.1 }))
@@ -895,7 +893,7 @@ fn make_tiles() {
     for num_tile_x in 0..num_tiles_x {
         for num_tile_y in 0..num_tiles_y {
 
-            let id = Entity::new()
+            let _id = Entity::new()
                 .with_merge(concepts::make_tile())
                 .with_merge(make_transformable())
                 .with(components::tile_seed(), seed + num_tile_x + num_tile_y * num_tiles_x)
@@ -1002,12 +1000,12 @@ fn get_height(x:f32, y:f32) -> f32 {
     let x = x as f32;
     let y = y as f32;
     // perlin noise without crate
-    let noise = (x.sin() * y.cos());
+    let noise = x.sin() * y.cos();
     let mut height = noise * 0.5 + 0.5;
 
     let simplex = SimplexNoise::new();
     let mut level: f32 = 8.0;
-    height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5);
+    height += simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5;
     level *= 3.0;
     height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 0.7;
     level *= 2.0;

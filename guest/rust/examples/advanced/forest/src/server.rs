@@ -5,14 +5,14 @@ use ambient_api::{
         ecs::{children, parent},
         physics::{
             character_controller_height, character_controller_radius, physics_controlled,
-            plane_collider, sphere_collider,
+            plane_collider,
         },
         player::{player, user_id},
         primitives::{cube, quad},
         rendering::{color, water, sky},
         transform::{local_to_parent, rotation, scale, translation},
     },
-    concepts::{make_perspective_infinite_reverse_camera, make_sphere, make_transformable},
+    concepts::{make_perspective_infinite_reverse_camera, make_transformable},
     prelude::*,
 };
 
