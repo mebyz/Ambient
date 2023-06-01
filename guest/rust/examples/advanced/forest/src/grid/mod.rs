@@ -7,6 +7,9 @@ use ambient_api::{
 #[path = "../tooling/mod.rs"]
 mod tooling;
 
+#[path = "../mesh_descriptor/mod.rs"]
+mod mesh_descriptor;
+
 const RESOLUTION_X: u32 = 32;
 const RESOLUTION_Y: u32 = 32;
 const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
@@ -45,7 +48,7 @@ impl Default for GridMesh {
     }
 }
 
-pub fn create_tile(grid: GridMesh) -> tooling::MeshDescriptor {
+pub fn create_tile(grid: GridMesh) -> mesh_descriptor::MeshDescriptor {
     // Create the tile
     let (vertices1, uvs1, normals1, indices) = build_tile(&grid);
 
@@ -62,7 +65,7 @@ pub fn create_tile(grid: GridMesh) -> tooling::MeshDescriptor {
         let nz = normals1[i].z;
 
         let v = mesh::Vertex {
-            position: vec3(px, py, pz) + vec3(-0.5 * SIZE_X, -0.5 * SIZE_Y, 0.0),
+            position: vec3(px, py, pz),
             normal: vec3(nx, ny, nz),
             tangent: vec3(1.0, 0.0, 0.0),
             texcoord0: vec2(u, v),
@@ -70,7 +73,7 @@ pub fn create_tile(grid: GridMesh) -> tooling::MeshDescriptor {
         vertices.push(v);
     }
 
-    tooling::MeshDescriptor { vertices, indices }
+    mesh_descriptor::MeshDescriptor { vertices, indices }
 }
 
 pub fn build_tile(grid: &GridMesh) -> (Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u32>) {

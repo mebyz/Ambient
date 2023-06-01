@@ -4,6 +4,7 @@ name = "A forest"
 version = "0.0.1"
 
 [components]
+track_audio_url = { type = "String", name = "Track Audio URL", description = "URL of the track audio", attributes = ["Networked", "Debuggable"]}
 rotating_sun = { type = "Bool", name = "Rotating sun", description = "Whether or not rotate the sun automatically" }
 tile_seed = { type = "I32", name = "Tile seed", description = "The seed of the tile" }
 tile_x = { type = "I32", name = "Tile x", description = "The x index of the tile" }

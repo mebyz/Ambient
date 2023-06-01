@@ -19,4 +19,20 @@
       },
       "output_quads": true
     }
-  }]
+  },
+  {
+      "pipeline": {
+        "type": "Materials",
+        "importer": {
+          "type": "Single",
+          "name": "palms",
+          "base_color": "berries.png"
+        },
+        "output_quads": true
+      }
+    },
+    {
+        "pipeline": {
+          "type": "Audio"
+        }
+    }]

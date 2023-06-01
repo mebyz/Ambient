@@ -1,12 +1,6 @@
 use rand::prelude::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use ambient_api::mesh::Vertex;
-
-pub struct MeshDescriptor {
-    pub vertices: Vec<Vertex>,
-    pub indices: Vec<u32>,
-}
 
 pub fn gen_rn(seed: i32, min: f32, max: f32) -> f32 {
     let mut rng = ChaCha8Rng::seed_from_u64(seed as u64);
@@ -169,5 +163,5 @@ pub fn get_height(x:f32, y:f32) -> f32 {
     // height += (simplex.noise(x as f32 / level, y as f32 / level) / 2.0 + 0.5) * 1.8;
     // height /= 1.0 + 0.5 + 0.25 + 0.125;
     height = (f32::cos(x)+f32::sin(y))/5.0;
-    height
+    height * 2.0
 }

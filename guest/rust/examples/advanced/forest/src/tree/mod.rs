@@ -10,6 +10,9 @@ use rand_chacha::ChaCha8Rng;
 #[path = "../tooling/mod.rs"]
 mod tooling;
 
+#[path = "../mesh_descriptor/mod.rs"]
+mod mesh_descriptor;
+
 const RESOLUTION_X: u32 = 32;
 const RESOLUTION_Y: u32 = 32;
 const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
@@ -37,7 +40,7 @@ pub struct TreeMesh {
     pub foliage_segments: u32,
 }
 
-pub fn create_tree(tree: TreeMesh) -> tooling::MeshDescriptor {
+pub fn create_tree(tree: TreeMesh) -> mesh_descriptor::MeshDescriptor {
     // Create the trunk
     let (mut vertices1, top_vertices1, mut normals1, mut uvs1, _trunk_direction) =
         build_trunk(&tree);
@@ -154,13 +157,11 @@ pub fn create_tree(tree: TreeMesh) -> tooling::MeshDescriptor {
     }
 
     // Generate foliage
-    let foliage_count = tree.foliage_density + tree.foliage_segments;
+    let foliage_count = tree.foliage_density;
     let foliage_radius_variance = 0.05;
     let mut foliage_position_variance = vec3(3.0, 3.0, 3.0);
     if tree.foliage_radius < 1.0
     {
-//        foliage_count = 2;
-//        foliage_radius_variance = 0.1;
         foliage_position_variance = vec3(0.1, 0.1, 0.1);
     }
     for i in 0..foliage_count {
@@ -212,9 +213,21 @@ pub fn create_tree(tree: TreeMesh) -> tooling::MeshDescriptor {
                 // Map trunk to the lower portion of the texture
                 i as f32 / segments as f32
             };
+// Calculate the u-coordinate for foliage vertices
+let u = j as f32 / segments as f32;
 
-            // Update the UV coordinate calculation
-            sphere_uvs.push(vec2(j as f32 / segments as f32, v));
+// Calculate the v-coordinate for foliage vertices
+let v = if i < segments {
+    // Map foliage to the upper portion of the texture
+    0.5 + (i as f32 / segments as f32) * 0.5
+} else {
+    // Map trunk to the lower portion of the texture
+    (i - segments) as f32 / segments as f32
+};
+
+// Update the UV coordinate calculation
+sphere_uvs.push(vec2(u, v));
+
         }
     }
 
@@ -313,7 +326,7 @@ pub fn create_tree(tree: TreeMesh) -> tooling::MeshDescriptor {
         // vertices.push(v);
     }
 
-    tooling::MeshDescriptor { vertices, indices }
+    mesh_descriptor::MeshDescriptor { vertices, indices }
 }
 
 fn build_trunk(tree: &TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Vec2>, Vec3) {

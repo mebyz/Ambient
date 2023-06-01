@@ -16,25 +16,16 @@ use ambient_api::{
     prelude::*,
 };
 
-use components::{player_head_ref, player_movement_direction, player_pitch, player_yaw};
+use components::{player_head_ref, player_movement_direction, player_pitch, player_yaw, track_audio_url};
 use std::f32::consts::{PI, TAU};
+
+mod tooling;
 
 #[main]
 pub fn main() {
-    Entity::new()
-        .with_merge(make_transformable())
-        .with_default(quad())
-        .with(scale(), Vec3::ONE * 0.)
-        .with(color(), vec4(0., 0., 1., 1.))
-        .with_default(plane_collider())
-        .spawn();
+    let bgm_url = asset::url("assets/forest.ogg").unwrap();
 
-    // Entity::new()
-    //     .with_merge(make_transformable())
-    //     .with_merge(make_sphere())
-    //     .with(sphere_collider(), 0.01)
-    //     .with(translation(), vec3(5., 5., 1.))
-    //     .spawn();
+    entity::add_component(entity::synchronized_resources(), track_audio_url(), bgm_url);
 
         Entity::new()
         .with_merge(make_transformable())
@@ -48,12 +39,6 @@ pub fn main() {
     .with(fog_density(), 1.0)
     .spawn();
 
-    // Entity::new()
-    //     .with_merge(make_transformable())
-    //     .with_merge(make_sphere())
-    //     .with(sphere_collider(), 0.5)
-    //     .with(translation(), vec3(5., 5., 1.))
-    //     .spawn();
 
     spawn_query((player(), user_id())).bind(move |players| {
         for (id, (_, uid)) in players {
@@ -62,7 +47,7 @@ pub fn main() {
                 .with(aspect_ratio_from_window(), EntityId::resources())
                 .with_default(main_scene())
                 .with(user_id(), uid)
-                .with(translation(), Vec3::Z * 2.)
+                .with(translation(), Vec3::Z)
                 //.with(translation(), vec3(0.0, 0.0, 4.0))
                 //.with(lookat_target(), vec3(5.0, 5.0, 3.0))
                 .with(parent(), id)
@@ -75,7 +60,7 @@ pub fn main() {
                 Entity::new()
                     .with_merge(make_transformable())
                     .with_default(cube())
-                    .with(color(), Vec4::ONE)
+                    .with(scale(), Vec3::ONE)
                     .with(character_controller_height(), 2.)
                     .with(character_controller_radius(), 0.5)
                     .with_default(physics_controlled())
@@ -109,10 +94,26 @@ pub fn main() {
 
     query((player(), player_movement_direction(), rotation())).each_frame(move |players| {
         for (player_id, (_, direction, rot)) in players {
-            let speed = 0.1;
+            let speed = 0.02;
 
-            let displace = rot * (direction.normalize_or_zero() * speed);
+            let mut displace = rot * (direction.normalize_or_zero() * speed);
+
+            let mut pos = entity::get_component(player_id, translation()).unwrap_or_default();
+            let h = tooling::get_height(pos.x, pos.y)*2.0;
+
+            let displace_z = h - pos.z;
+
+            if displace != Vec3::ZERO {
+                println!("x:{} y:{} z:{} h:{} d:{}", pos.x, pos.y, pos.z, h, displace_z);
+                displace = Vec3::new(displace.x, displace.y, displace_z);
+            }
+
+
+
+
+            //entity::set_component(player_id, translation(), pos);
             physics::move_character(player_id, displace, 0.01, frametime());
+
         }
     });
 }

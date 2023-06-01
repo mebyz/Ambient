@@ -43,10 +43,10 @@ pub fn main() {
                 .with(aspect_ratio_from_window(), EntityId::resources())
                 .with_default(main_scene())
                 .with(user_id(), uid)
-                .with(translation(), Vec3::Z * 2.)
+                //.with(translation(), Vec3::Z * 2.)
                 .with(parent(), id)
                 .with_default(local_to_parent())
-                .with(rotation(), Quat::from_rotation_x(PI / 2.))
+                //.with(rotation(), Quat::from_rotation_x(PI / 2.))
                 .spawn();
 
             entity::add_components(
@@ -55,7 +55,7 @@ pub fn main() {
                     .with_merge(make_transformable())
                     .with_default(cube())
                     .with(color(), Vec4::ONE)
-                    .with(character_controller_height(), 2.)
+                    .with(character_controller_height(), 0.)
                     .with(character_controller_radius(), 0.5)
                     .with_default(physics_controlled())
                     .with(player_head_ref(), head)

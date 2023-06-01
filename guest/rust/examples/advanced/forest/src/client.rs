@@ -59,7 +59,7 @@ fn make_lighting() {
             Quat::from_rotation_y(-90_f32.to_radians())
                 * Quat::from_rotation_z(-90_f32.to_radians()),
         )
-        .with(light_diffuse(), Vec3::ONE * 3.0)
+        .with(light_diffuse(), Vec3::ONE * 10.0)
         .with_default(main_scene())
         .with(rotating_sun(), false)
         .spawn();
@@ -279,9 +279,10 @@ fn register_augmentors() {
 }
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (123456, 50),
-        "bush" => (123457, 100),
-        "mushrooms" => (123458, 50),
+        "trees" => (123456, 100),
+        "bush" => (123457, 150),
+        "mushrooms" => (123458, 100),
+        "berries" => (123459, 50),
         _ => panic!("Invalid vegetation type"),
     };
 
@@ -318,12 +319,22 @@ fn make_vegetation(vegetation_type: &str) {
                     0.9,
                     5,
                 ),
+                "berries" => (
+                    0.01,
+                    0.01,
+                    1,
+                    0.01,
+                    0.01,
+                    2,
+                    1.0,
+                    10,
+                ),
                 _ => panic!("Invalid vegetation type"),
             };
 
         let x = tooling::gen_rn(seed + i, 0.0, 5.0) * 2.0;
         let y = tooling::gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
-        let position = vec3(x, y, tooling::get_height(x, y)*2.0)+0.2;
+        let position = vec3(x, y, tooling::get_height(x, y)*2.0);
 
         let _id = Entity::new()
             .with_merge(concepts::make_tree())
@@ -341,7 +352,9 @@ fn make_vegetation(vegetation_type: &str) {
             .with(components::tree_foliage_segments(), foliage_segments)
             .with(
                 pbr_material_from_url(),
-                if vegetation_type == "mushrooms" { asset::url("assets/pipeline.json/1/mat.json").unwrap() } else { asset::url("assets/pipeline.json/0/mat.json").unwrap() },
+                if vegetation_type == "mushrooms" { asset::url("assets/pipeline.json/1/mat.json").unwrap() }
+                else if vegetation_type == "berries" { asset::url("assets/pipeline.json/2/mat.json").unwrap() }
+                else { asset::url("assets/pipeline.json/0/mat.json").unwrap() },
             )
             .spawn();
     }
@@ -376,9 +389,10 @@ pub async fn main() {
 
     register_augmentors();
     make_tiles();
-    make_vegetation("trees");
-    make_vegetation("bush");
-    make_vegetation("mushrooms");
+   make_vegetation("trees");
+   make_vegetation("bush");
+   make_vegetation("mushrooms");
+    make_vegetation("berries");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {
@@ -401,22 +415,6 @@ pub async fn main() {
             displace.x += 1.0;
         }
 
-        let mut player_position = last_player_position;
-
-        player_position.z = tooling::get_height(
-            player_position.x,
-            player_position.y,
-        );
-
-        displace.z = player_position.z - last_player_position.z;
-
-        player_position.x += displace.x * 0.1;
-        player_position.y += displace.y * 0.1;
-
-        last_player_position = player_position;
-
-        // println("player_position", player_position);
-        // println("displace", displace);
 
         messages::Input::new(displace, input.mouse_delta).send_server_unreliable();
     });
