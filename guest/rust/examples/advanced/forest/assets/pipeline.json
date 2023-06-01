@@ -33,6 +33,17 @@
     },
     {
         "pipeline": {
+          "type": "Materials",
+          "importer": {
+            "type": "Single",
+            "name": "tree2",
+            "base_color": "tree2.png"
+          },
+          "output_quads": true
+        }
+      },
+    {
+        "pipeline": {
           "type": "Audio"
         }
     }]

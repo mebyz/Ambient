@@ -228,9 +228,7 @@ fn register_augmentors() {
                 id,
                 Entity::new()
                     .with(procedural_mesh(), mesh)
-                    // green
-                    //.with(procedural_material(), material)
-                    .with_default(cast_shadows()),
+                    //.with_default(cast_shadows()),
             );
         }
     });
@@ -266,22 +264,17 @@ fn register_augmentors() {
                     .with(procedural_mesh(), mesh)
                     .with(scale(), 2.0 * Vec3::ONE)
 
-                    //.with(color(), vec4(0.25, 1.0, 0.25, 1.0))
                     .with(procedural_material(), material2)
-                    // .with(
-                    //     pbr_material_from_url(),
-                    //     asset::url("assets/pipeline.json/0/mat.json").unwrap(),
-                    // )
-                    //.with_default(cast_shadows()),
             );
         }
     });
 }
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (123456, 100),
-        "bush" => (123457, 150),
-        "mushrooms" => (123458, 100),
+        "trees" => (123456, 50),
+        "trees2" => (123460, 50),
+        "bush" => (123457, 50),
+        "mushrooms" => (123458, 50),
         "berries" => (123459, 50),
         _ => panic!("Invalid vegetation type"),
     };
@@ -298,6 +291,16 @@ fn make_vegetation(vegetation_type: &str) {
                     5,
                     2.0,
                     5,
+                ),
+                "trees2" => (
+                    tooling::gen_rn(seed + i, 1.0, 2.0),
+                    tooling::gen_rn(seed + i, 20.0, 25.0),
+                    tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
+                    tooling::gen_rn(seed + i, 0.3, 0.4),
+                    tooling::gen_rn(seed + i, 60.0, 90.0),
+                    1,
+                    1.0,
+                    1,
                 ),
                 "bush" => (
                     tooling::gen_rn(seed + i, 0.2, 0.3),
@@ -334,7 +337,7 @@ fn make_vegetation(vegetation_type: &str) {
 
         let x = tooling::gen_rn(seed + i, 0.0, 5.0) * 2.0;
         let y = tooling::gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
-        let position = vec3(x, y, tooling::get_height(x, y)*2.0);
+        let position = vec3(x, y, tooling::get_height(x, y)*2.0 - 0.1);
 
         let _id = Entity::new()
             .with_merge(concepts::make_tree())
@@ -354,6 +357,7 @@ fn make_vegetation(vegetation_type: &str) {
                 pbr_material_from_url(),
                 if vegetation_type == "mushrooms" { asset::url("assets/pipeline.json/1/mat.json").unwrap() }
                 else if vegetation_type == "berries" { asset::url("assets/pipeline.json/2/mat.json").unwrap() }
+                else if vegetation_type == "trees2" { asset::url("assets/pipeline.json/3/mat.json").unwrap() }
                 else { asset::url("assets/pipeline.json/0/mat.json").unwrap() },
             )
             .spawn();
@@ -393,6 +397,7 @@ pub async fn main() {
    make_vegetation("bush");
    make_vegetation("mushrooms");
     make_vegetation("berries");
+    make_vegetation("trees2");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {

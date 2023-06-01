@@ -368,7 +368,7 @@ fn build_trunk(tree: &TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Vec2>, 
         let top_position = trunk_direction * z;
 
         let gravity_factor = (1.0 - (i as f32 / tree.trunk_segments as f32)).powf(2.0);
-        let gravity_offset = trunk_direction * gravity_factor * 2.0 * i as f32;
+        let gravity_offset = trunk_direction * gravity_factor * 5.0 * i as f32;
 
         for j in 0..=sectors {
             let sector_angle = j as f32 * sector_step;
