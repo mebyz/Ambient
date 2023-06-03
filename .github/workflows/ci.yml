@@ -31,6 +31,10 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: protoc@3.21.12
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: clippy
       - name: Run clippy
         uses: actions-rs/cargo@v1
         with:
@@ -44,6 +48,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: wasm32-unknown-unknown
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: clippy-web
+          workspaces: |
+            .
+            web
       - name: Run clippy
         working-directory: web
         run: cargo clippy --workspace
@@ -218,4 +229,8 @@ jobs:
         with:
           cache-group: "main"
       - name: Check that new-project works
-        run: cargo run -- new guest/rust/examples/basics/ci_test_project && cd guest/rust/examples/basics/ci_test_project && cargo check
+        run: |
+          mkdir tmp 
+          cargo run -- new --api-path $(pwd)/guest/rust/api /tmp/ci_test_project
+          cd /tmp/ci_test_project
+          cargo check
