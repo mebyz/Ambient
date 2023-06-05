@@ -271,7 +271,7 @@ fn register_augmentors() {
 }
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (123456, 50),
+        "trees" => (123456, 10),
         "trees2" => (123460, 50),
         "bush" => (123457, 50),
         "mushrooms" => (123458, 50),
@@ -283,7 +283,7 @@ fn make_vegetation(vegetation_type: &str) {
         let (trunk_radius, trunk_height, trunk_segments, branch_length, branch_angle, foliage_density, foliage_radius, foliage_segments) =
             match vegetation_type {
                 "trees" => (
-                    tooling::gen_rn(seed + i, 2.0, 3.0),
+                    tooling::gen_rn(seed + i, 10.0, 15.0),
                     tooling::gen_rn(seed + i, 15.0, 20.0),
                     tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
                     tooling::gen_rn(seed + i, 0.1, 0.3),
@@ -394,10 +394,10 @@ pub async fn main() {
     register_augmentors();
     make_tiles();
    make_vegetation("trees");
-   make_vegetation("bush");
-   make_vegetation("mushrooms");
-    make_vegetation("berries");
-    make_vegetation("trees2");
+//    make_vegetation("bush");
+//    make_vegetation("mushrooms");
+//     make_vegetation("berries");
+//     make_vegetation("trees2");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {

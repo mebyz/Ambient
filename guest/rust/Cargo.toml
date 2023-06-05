@@ -4,6 +4,7 @@ members = [
     "api_core",
     "api_core/api_macros",
     # Basics
+    "examples/advanced/forest",
     "examples/basics/asset_loading",
     "examples/basics/async",
     "examples/basics/clientside",
