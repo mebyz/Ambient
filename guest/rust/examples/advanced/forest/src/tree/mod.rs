@@ -471,8 +471,12 @@ fn build_tree_ramification(
         let mut z = height * (i as f32 / segments as f32);
         radius = radius * (1.0 - i as f32 / segments as f32 / 2.0) * (1.0 - variance);
 
+
+        if i == segments - 2 {
+            radius = 8.0 * radius * i as f32 / segments as f32;
+        }
         if i == segments - 1 {
-            radius = 20.0 * radius * i as f32 / segments as f32;
+            radius = 12.0 * radius * i as f32 / segments as f32;
         }
         if i == segments {
             radius = 0.0;

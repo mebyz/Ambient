@@ -285,7 +285,7 @@ fn make_vegetation(vegetation_type: &str) {
                 "trees" => (
                     tooling::gen_rn(seed + i, 10.0, 15.0),
                     tooling::gen_rn(seed + i, 15.0, 20.0),
-                    tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
+                    tooling::gen_rn(seed + i, 12.0, 20.0) as u32,
                     tooling::gen_rn(seed + i, 0.1, 0.3),
                     tooling::gen_rn(seed + i, 10.0, 12.0),
                     5,
