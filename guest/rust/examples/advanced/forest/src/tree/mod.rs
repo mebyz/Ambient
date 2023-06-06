@@ -350,7 +350,7 @@ fn build_trunk2(tree: &mut TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Ve
     let mut radius = tree.trunk_radius / 2.0;
 
     // First build the trunk
-    let (trunk_positions, trunk_radiuses) = build_segment(
+    let (trunk_positions, trunk_radiuses) = build_tree_ramification(
         tree,
         tree.trunk_segments as usize,
         &mut vertices,
@@ -393,7 +393,7 @@ fn build_trunk2(tree: &mut TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Ve
             let trunk_slope = calculate_trunk_slope(tree, branch_position);
             let branch_rotation = calculate_branch_rotation(trunk_slope);
 
-            build_segment(
+            build_tree_ramification(
                 tree,
                 tree.trunk_segments as usize,
                 &mut vertices,
@@ -439,7 +439,7 @@ fn calculate_branch_rotation(slope: f32) -> Quat {
 }
 
 // This function builds a segment (trunk or branch) of the tree
-fn build_segment(
+fn build_tree_ramification(
     tree: &mut TreeMesh,
     segments: usize,
     vertices: &mut Vec<Vec3>,
@@ -468,8 +468,17 @@ fn build_segment(
 
     for i in 0..=segments {
         let variance = tooling::gen_rn(tree.seed + i as i32, 0.0, 1.0) * radius_variance;
-        let z = height * (i as f32 / segments as f32);
+        let mut z = height * (i as f32 / segments as f32);
         radius = radius * (1.0 - i as f32 / segments as f32 / 2.0) * (1.0 - variance);
+
+        if i == segments - 1 {
+            radius = 20.0 * radius * i as f32 / segments as f32;
+        }
+        if i == segments {
+            radius = 0.0;
+            //z = height * ((i - 1) as f32 / segments as f32) + 1.0;
+        }
+
         center_radiuses.push(radius);
         current_position = current_position + current_direction * z;
 
@@ -481,15 +490,12 @@ fn build_segment(
             let y = radius * sector_angle.sin();
 
             let mut vertex = current_position + vec3(x, y, z);
-            if is_branch {
-                // Rotate the branch base position
-                //let rotated_vertex = branch_rotation * (vertex - position) + position;
-                //vertex = rotated_vertex;
-            }
+
 
             vertices.push(vertex);
             normals.push(vec3(x, y, z).normalize());
-            uvs.push(vec2(j as f32 / sectors as f32, i as f32 / segments as f32));
+            uvs.push(vec2(j as f32 / sectors as f32, z / height));
+            //uvs.push(vec2(j as f32 / sectors as f32, i as f32 / segments as f32));
 
             if i < segments && j <= sectors {
                 let current_index: u32 = (vertices.len() - 1) as u32;
@@ -508,30 +514,6 @@ fn build_segment(
                         indices.push(next_index);
                         indices.push(next_row_next_index);
                     } else {
-                        // Handle the last sector of each branch segment
-                        // let branch_current_index = current_index - vertices_per_row as u32;
-                        // let branch_next_index = next_index - vertices_per_row as u32;
-                        // let branch_next_row_index = next_row_index - vertices_per_row as u32;
-
-                        // indices.push(branch_current_index);
-                        // indices.push(current_index);
-                        // indices.push(branch_next_index);
-
-                        // indices.push(current_index);
-                        // indices.push(branch_next_row_index);
-                        // indices.push(branch_next_index);
-
-                        // Handle the last sector of the trunk segment
-                        // let trunk_current_index = trunk_vertices_start + current_index - vertices_per_row as u32;
-                        // let trunk_next_row_index = trunk_current_index + vertices_per_row as u32;
-
-                        // indices.push(trunk_current_index);
-                        // indices.push(current_index);
-                        // indices.push(trunk_next_row_index);
-
-                        // indices.push(current_index);
-                        // indices.push(next_row_index);
-                        // indices.push(trunk_next_row_index);
                     }
                 } else {
                     // For trunk, create faces as usual
