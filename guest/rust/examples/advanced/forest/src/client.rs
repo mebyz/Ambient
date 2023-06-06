@@ -11,9 +11,9 @@ use ambient_api::{
 use components::rotating_sun;
 use palette::IntoColor;
 
+mod grid;
 mod tooling;
 mod tree;
-mod grid;
 
 const RESOLUTION_X: u32 = 32;
 const RESOLUTION_Y: u32 = 32;
@@ -74,7 +74,7 @@ fn make_lighting() {
                 entity::set_component(
                     sun_id,
                     rotation(),
-                    Quat::from_rotation_z(frametime()/10.0) * sun_rotation,
+                    Quat::from_rotation_z(frametime() / 10.0) * sun_rotation,
                 );
             }
         });
@@ -120,25 +120,24 @@ fn register_augmentors() {
     let base_color_map = make_texture(|x, _| {
         let hsl = palette::Hsl::new(360.0 * x, 1.0, 0.5).into_format::<f32>();
         let rgb: palette::LinSrgb = hsl.into_color();
-        let r = 50;//(255.0 * rgb.red/2.0) as u8;
+        let r = 50; //(255.0 * rgb.red/2.0) as u8;
         let g = (255.0 * rgb.green) as u8;
-        let b = 50;//(255.0 * rgb.blue/2.0) as u8;
+        let b = 50; //(255.0 * rgb.blue/2.0) as u8;
         let a = 255;
         [r, g, b, a]
     });
 
     let base_color_map2 = make_texture(|x, y| {
-            let mx = x * 10.0;
-            let my = y * 10.0;
-            let mut h = tooling::get_height(mx, my);
-            h = h * 255.0 / 4.0;
-            let r = h as u8 + 100;
-            let g = h as u8 + 50;
-            let b = h as u8;
-            let a = 255 as u8;
-            [r, g, b, a]
+        let mx = x * 10.0;
+        let my = y * 10.0;
+        let mut h = tooling::get_height(mx, my);
+        h = h * 255.0 / 4.0;
+        let r = h as u8 + 100;
+        let g = h as u8 + 50;
+        let b = h as u8;
+        let a = 255 as u8;
+        [r, g, b, a]
     });
-
 
     let metallic_roughness_map2 = make_texture(|x, y| {
         let mx = x * 10.0;
@@ -151,7 +150,6 @@ fn register_augmentors() {
         let a = 255 as u8;
         [r, g, b, a]
     });
-
 
     let normal_map = make_texture(|_, _| [128, 128, 255, 0]);
     let _normal_map2 = make_texture(|_, _| [255, 128, 255, 0]);
@@ -167,8 +165,8 @@ fn register_augmentors() {
 
     let material2 = material::create(&material::Descriptor {
         base_color_map: base_color_map2,
-        normal_map : base_color_map2,
-        metallic_roughness_map : metallic_roughness_map2,
+        normal_map: base_color_map2,
+        metallic_roughness_map: metallic_roughness_map2,
         sampler,
         transparent: false,
     });
@@ -226,27 +224,35 @@ fn register_augmentors() {
 
             entity::add_components(
                 id,
-                Entity::new()
-                    .with(procedural_mesh(), mesh)
-                    //.with_default(cast_shadows()),
+                Entity::new().with(procedural_mesh(), mesh), //.with_default(cast_shadows()),
             );
         }
     });
 
-    spawn_query(
-        (components::tile_seed(),
+    spawn_query((
+        components::tile_seed(),
         components::tile_size(),
         components::tile_x(),
         components::tile_y(),
-    )).bind(move |tiles| {
+    ))
+    .bind(move |tiles| {
         for (id, (_seed, size, tile_x, tile_y)) in tiles {
             let tile = grid::create_tile(grid::GridMesh {
-                top_left: Vec2 { x: tile_x as f32 * size, y: tile_y as f32 * size},
+                top_left: Vec2 {
+                    x: tile_x as f32 * size,
+                    y: tile_y as f32 * size,
+                },
                 size: Vec2 { x: size, y: size },
                 n_vertices_width: 10,
                 n_vertices_height: 10,
-                uv_min: Vec2 { x: (tile_x as f32)*size/5.0, y: (tile_y as f32)*size/5.0},
-                uv_max: Vec2 { x: (tile_x as f32 + 1.0)*size/5.0, y: (tile_y as f32 + 1.0)*size/5.0},
+                uv_min: Vec2 {
+                    x: (tile_x as f32) * size / 5.0,
+                    y: (tile_y as f32) * size / 5.0,
+                },
+                uv_max: Vec2 {
+                    x: (tile_x as f32 + 1.0) * size / 5.0,
+                    y: (tile_y as f32 + 1.0) * size / 5.0,
+                },
                 normal: Vec3 {
                     x: 0.0,
                     y: 0.0,
@@ -263,8 +269,7 @@ fn register_augmentors() {
                 Entity::new()
                     .with(procedural_mesh(), mesh)
                     .with(scale(), 2.0 * Vec3::ONE)
-
-                    .with(procedural_material(), material2)
+                    .with(procedural_material(), material2),
             );
         }
     });
@@ -280,69 +285,75 @@ fn make_vegetation(vegetation_type: &str) {
     };
 
     for i in 0..num_vegetation {
-        let (trunk_radius, trunk_height, trunk_segments, branch_length, branch_angle, foliage_density, foliage_radius, foliage_segments) =
-            match vegetation_type {
-                "trees" => (
-                    tooling::gen_rn(seed + i, 10.0, 15.0),
-                    tooling::gen_rn(seed + i, 15.0, 20.0),
-                    tooling::gen_rn(seed + i, 12.0, 20.0) as u32,
-                    tooling::gen_rn(seed + i, 0.1, 0.3),
-                    tooling::gen_rn(seed + i, 10.0, 12.0),
-                    5,
-                    2.0,
-                    5,
-                ),
-                "trees2" => (
-                    tooling::gen_rn(seed + i, 1.0, 2.0),
-                    tooling::gen_rn(seed + i, 20.0, 25.0),
-                    tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
-                    tooling::gen_rn(seed + i, 0.3, 0.4),
-                    tooling::gen_rn(seed + i, 60.0, 90.0),
-                    1,
-                    1.0,
-                    1,
-                ),
-                "bush" => (
-                    tooling::gen_rn(seed + i, 0.2, 0.3),
-                    0.01,
-                    1,
-                    1.0,
-                    1.0,
-                    0,
-                    0.0,
-                    0,
-                ),
-                "mushrooms" => (
-                    1.0,
-                    2.0,
-                    2,
-                    0.01,
-                    0.01,
-                    1,
-                    0.9,
-                    5,
-                ),
-                "berries" => (
-                    0.01,
-                    0.01,
-                    1,
-                    0.01,
-                    0.01,
-                    2,
-                    1.0,
-                    10,
-                ),
-                _ => panic!("Invalid vegetation type"),
-            };
+        let (
+            trunk_radius,
+            trunk_height,
+            trunk_segments,
+            branch_length,
+            branch_angle,
+            foliage_density,
+            foliage_radius,
+            foliage_segments,
+        ) = match vegetation_type {
+            "trees" => (
+                tooling::gen_rn(seed + i, 10.0, 15.0),
+                tooling::gen_rn(seed + i, 15.0, 20.0),
+                tooling::gen_rn(seed + i, 12.0, 20.0) as u32,
+                tooling::gen_rn(seed + i, 0.1, 0.3),
+                tooling::gen_rn(seed + i, 10.0, 12.0),
+                5,
+                2.0,
+                5,
+            ),
+            "trees2" => (
+                tooling::gen_rn(seed + i, 1.0, 2.0),
+                tooling::gen_rn(seed + i, 20.0, 25.0),
+                tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
+                tooling::gen_rn(seed + i, 0.3, 0.4),
+                tooling::gen_rn(seed + i, 60.0, 90.0),
+                1,
+                1.0,
+                1,
+            ),
+            "bush" => (
+                tooling::gen_rn(seed + i, 0.2, 0.3),
+                0.01,
+                1,
+                1.0,
+                1.0,
+                0,
+                0.0,
+                0,
+            ),
+            "mushrooms" => (1.0, 2.0, 2, 0.01, 0.01, 1, 0.9, 5),
+            "berries" => (0.01, 0.01, 1, 0.01, 0.01, 2, 1.0, 10),
+            _ => panic!("Invalid vegetation type"),
+        };
 
         let x = tooling::gen_rn(seed + i, 0.0, 5.0) * 2.0;
         let y = tooling::gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
-        let position = vec3(x, y, tooling::get_height(x, y)*2.0 - 0.1);
+        let position = vec3(x, y, tooling::get_height(x, y) * 2.0 - 0.1);
 
         let _id = Entity::new()
             .with_merge(concepts::make_tree())
             .with_merge(make_transformable())
-            .with(scale(), Vec3::ONE * tooling::gen_rn(i, if vegetation_type == "trees" { 0.03 } else { 0.05 }, if vegetation_type == "trees" { 0.08 } else { 0.1 }))
+            .with(
+                scale(),
+                Vec3::ONE
+                    * tooling::gen_rn(
+                        i,
+                        if vegetation_type == "trees" {
+                            0.03
+                        } else {
+                            0.05
+                        },
+                        if vegetation_type == "trees" {
+                            0.08
+                        } else {
+                            0.1
+                        },
+                    ),
+            )
             .with(translation(), position)
             .with(components::tree_seed(), seed + i)
             .with(components::tree_trunk_radius(), trunk_radius)
@@ -355,10 +366,15 @@ fn make_vegetation(vegetation_type: &str) {
             .with(components::tree_foliage_segments(), foliage_segments)
             .with(
                 pbr_material_from_url(),
-                if vegetation_type == "mushrooms" { asset::url("assets/pipeline.json/1/mat.json").unwrap() }
-                else if vegetation_type == "berries" { asset::url("assets/pipeline.json/2/mat.json").unwrap() }
-                else if vegetation_type == "trees2" { asset::url("assets/pipeline.json/3/mat.json").unwrap() }
-                else { asset::url("assets/pipeline.json/0/mat.json").unwrap() },
+                if vegetation_type == "mushrooms" {
+                    asset::url("assets/pipeline.json/1/mat.json").unwrap()
+                } else if vegetation_type == "berries" {
+                    asset::url("assets/pipeline.json/2/mat.json").unwrap()
+                } else if vegetation_type == "trees2" {
+                    asset::url("assets/pipeline.json/3/mat.json").unwrap()
+                } else {
+                    asset::url("assets/pipeline.json/0/mat.json").unwrap()
+                },
             )
             .spawn();
     }
@@ -372,11 +388,13 @@ fn make_tiles() {
 
     for num_tile_x in 0..num_tiles_x {
         for num_tile_y in 0..num_tiles_y {
-
             let _id = Entity::new()
                 .with_merge(concepts::make_tile())
                 .with_merge(make_transformable())
-                .with(components::tile_seed(), seed + num_tile_x + num_tile_y * num_tiles_x)
+                .with(
+                    components::tile_seed(),
+                    seed + num_tile_x + num_tile_y * num_tiles_x,
+                )
                 .with(components::tile_size(), size)
                 .with(components::tile_x(), num_tile_x)
                 .with(components::tile_y(), num_tile_y)
@@ -393,11 +411,11 @@ pub async fn main() {
 
     register_augmentors();
     make_tiles();
-   make_vegetation("trees");
-//    make_vegetation("bush");
-//    make_vegetation("mushrooms");
-//     make_vegetation("berries");
-//     make_vegetation("trees2");
+    make_vegetation("trees");
+    //    make_vegetation("bush");
+    //    make_vegetation("mushrooms");
+    //     make_vegetation("berries");
+    //     make_vegetation("trees2");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {
@@ -419,7 +437,6 @@ pub async fn main() {
         if input.keys.contains(&KeyCode::D) {
             displace.x += 1.0;
         }
-
 
         messages::Input::new(displace, input.mouse_delta).send_server_unreliable();
     });

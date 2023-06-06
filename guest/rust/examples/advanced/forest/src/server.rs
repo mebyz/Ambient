@@ -9,14 +9,16 @@ use ambient_api::{
         },
         player::{player, user_id},
         primitives::{cube, quad},
-        rendering::{color, water, sky},
+        rendering::{color, sky, water},
         transform::{local_to_parent, rotation, scale, translation},
     },
     concepts::{make_perspective_infinite_reverse_camera, make_transformable},
     prelude::*,
 };
 
-use components::{player_head_ref, player_movement_direction, player_pitch, player_yaw, track_audio_url};
+use components::{
+    player_head_ref, player_movement_direction, player_pitch, player_yaw, track_audio_url,
+};
 use std::f32::consts::{PI, TAU};
 
 mod tooling;
@@ -27,18 +29,17 @@ pub fn main() {
 
     entity::add_component(entity::synchronized_resources(), track_audio_url(), bgm_url);
 
-        Entity::new()
+    Entity::new()
         .with_merge(make_transformable())
         .with_default(water())
         .with(scale(), Vec3::ONE * 10.)
         .spawn();
 
     Entity::new()
-    .with_merge(make_transformable())
-    .with_default(sky())
-    .with(fog_density(), 1.0)
-    .spawn();
-
+        .with_merge(make_transformable())
+        .with_default(sky())
+        .with(fog_density(), 1.0)
+        .spawn();
 
     spawn_query((player(), user_id())).bind(move |players| {
         for (id, (_, uid)) in players {
@@ -99,21 +100,20 @@ pub fn main() {
             let mut displace = rot * (direction.normalize_or_zero() * speed);
 
             let mut pos = entity::get_component(player_id, translation()).unwrap_or_default();
-            let h = tooling::get_height(pos.x, pos.y)*2.0;
+            let h = tooling::get_height(pos.x, pos.y) * 2.0;
 
             let displace_z = h - pos.z;
 
             if displace != Vec3::ZERO {
-                println!("x:{} y:{} z:{} h:{} d:{}", pos.x, pos.y, pos.z, h, displace_z);
+                println!(
+                    "x:{} y:{} z:{} h:{} d:{}",
+                    pos.x, pos.y, pos.z, h, displace_z
+                );
                 displace = Vec3::new(displace.x, displace.y, displace_z);
             }
 
-
-
-
             //entity::set_component(player_id, translation(), pos);
             physics::move_character(player_id, displace, 0.01, frametime());
-
         }
     });
 }

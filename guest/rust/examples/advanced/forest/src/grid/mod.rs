@@ -1,8 +1,4 @@
-use ambient_api::{
-    client::{mesh},
-    mesh::Vertex,
-    prelude::*,
-};
+use ambient_api::{client::mesh, mesh::Vertex, prelude::*};
 
 #[path = "../tooling/mod.rs"]
 mod tooling;
@@ -16,8 +12,6 @@ const TEXTURE_RESOLUTION_X: u32 = 4 * RESOLUTION_X;
 const TEXTURE_RESOLUTION_Y: u32 = 4 * RESOLUTION_Y;
 const SIZE_X: f32 = RESOLUTION_X as f32 / RESOLUTION_Y as f32;
 const SIZE_Y: f32 = 1.0;
-
-
 
 const TAU: f32 = std::f32::consts::TAU;
 const WAVE_AMPLITUDE: f32 = 0.25;
@@ -90,7 +84,10 @@ pub fn build_tile(grid: &GridMesh) -> (Vec<Vec3>, Vec<Vec2>, Vec<Vec3>, Vec<u32>
             positions.push(vec3(
                 grid.top_left.x + grid.size.x * p.x,
                 grid.top_left.y + grid.size.y * p.y,
-                tooling::get_height((grid.top_left.x + grid.size.x * p.x)*2.0, (grid.top_left.y + grid.size.y * p.y)*2.0),
+                tooling::get_height(
+                    (grid.top_left.x + grid.size.x * p.x) * 2.0,
+                    (grid.top_left.y + grid.size.y * p.y) * 2.0,
+                ),
             ));
             texcoords.push(vec2(
                 grid.uv_min.x + (grid.uv_max.x - grid.uv_min.x) * p.x,
