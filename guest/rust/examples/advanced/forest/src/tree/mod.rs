@@ -1,8 +1,5 @@
 use ambient_api::{client::mesh, mesh::Vertex, prelude::*};
 
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
-
 #[path = "../tooling/mod.rs"]
 mod tooling;
 
@@ -75,7 +72,6 @@ pub fn create_tree(mut tree: TreeMesh) -> mesh_descriptor::MeshDescriptor {
 }
 
 fn build_tree(tree: &mut TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Vec2>, Vec3, Vec<u32>) {
-    println!("build_trunk {} {}", tree.trunk_segments, tree.trunk_height);
     let sectors = 12;
     let sector_step = 2. * std::f32::consts::PI / sectors as f32;
 
@@ -119,7 +115,6 @@ fn build_tree(tree: &mut TreeMesh) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec3>, Vec<Vec2
         let tpos = trunk_positions[i as usize];
         let trad = trunk_radiuses[i as usize];
         if branch_chance > 0.2 {
-            println!("branch on segment {}", i);
 
             let branch_direction = vec3(
                 tooling::gen_rn(tree.seed + i as i32 + 1, -1.0, 1.0),
@@ -221,15 +216,25 @@ fn build_tree_ramification(
         let mut z = height * (i as f32 / segments as f32);
         radius = radius * (1.0 - i as f32 / segments as f32 / 2.0) * (1.0 - variance);
 
-        if i == segments - 2 {
-            radius = 8.0 * radius * i as f32 / segments as f32;
+
+        if height > 5.0 {
+            if i == segments - 2 {
+                radius = 8.0 * radius * i as f32 / segments as f32;
+            }
+            if i == segments - 1 {
+                radius = 12.0 * radius * i as f32 / segments as f32;
+            }
         }
-        if i == segments - 1 {
-            radius = 12.0 * radius * i as f32 / segments as f32;
+        else {
+            if i == segments - 2 {
+                radius = 5.0 * radius * i as f32 / segments as f32;
+            }
+            if i == segments - 1 {
+                radius = 2.0 * radius * i as f32 / segments as f32;
+            }
         }
         if i == segments {
             radius = 0.0;
-            //z = height * ((i - 1) as f32 / segments as f32) + 1.0;
         }
 
         center_radiuses.push(radius);
@@ -247,7 +252,6 @@ fn build_tree_ramification(
             vertices.push(vertex);
             normals.push(vec3(x, y, z).normalize());
             uvs.push(vec2(j as f32 / sectors as f32, z / height));
-            //uvs.push(vec2(j as f32 / sectors as f32, i as f32 / segments as f32));
 
             if i < segments && j <= sectors {
                 let current_index: u32 = (vertices.len() - 1) as u32;

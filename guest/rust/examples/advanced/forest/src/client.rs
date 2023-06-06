@@ -277,10 +277,7 @@ fn register_augmentors() {
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
         "trees" => (123456, 10),
-        "trees2" => (123460, 50),
-        "bush" => (123457, 50),
-        "mushrooms" => (123458, 50),
-        "berries" => (123459, 50),
+        "trees2" => (123460, 10),
         _ => panic!("Invalid vegetation type"),
     };
 
@@ -306,8 +303,8 @@ fn make_vegetation(vegetation_type: &str) {
                 5,
             ),
             "trees2" => (
-                tooling::gen_rn(seed + i, 1.0, 2.0),
-                tooling::gen_rn(seed + i, 20.0, 25.0),
+                tooling::gen_rn(seed + i, 2.5, 4.0),
+                tooling::gen_rn(seed + i, 1.0, 3.0),
                 tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
                 tooling::gen_rn(seed + i, 0.3, 0.4),
                 tooling::gen_rn(seed + i, 60.0, 90.0),
@@ -315,18 +312,6 @@ fn make_vegetation(vegetation_type: &str) {
                 1.0,
                 1,
             ),
-            "bush" => (
-                tooling::gen_rn(seed + i, 0.2, 0.3),
-                0.01,
-                1,
-                1.0,
-                1.0,
-                0,
-                0.0,
-                0,
-            ),
-            "mushrooms" => (1.0, 2.0, 2, 0.01, 0.01, 1, 0.9, 5),
-            "berries" => (0.01, 0.01, 1, 0.01, 0.01, 2, 1.0, 10),
             _ => panic!("Invalid vegetation type"),
         };
 
@@ -342,16 +327,8 @@ fn make_vegetation(vegetation_type: &str) {
                 Vec3::ONE
                     * tooling::gen_rn(
                         i,
-                        if vegetation_type == "trees" {
-                            0.03
-                        } else {
-                            0.05
-                        },
-                        if vegetation_type == "trees" {
-                            0.08
-                        } else {
-                            0.1
-                        },
+                        0.05,
+                        0.1
                     ),
             )
             .with(translation(), position)
@@ -366,12 +343,8 @@ fn make_vegetation(vegetation_type: &str) {
             .with(components::tree_foliage_segments(), foliage_segments)
             .with(
                 pbr_material_from_url(),
-                if vegetation_type == "mushrooms" {
+                if vegetation_type == "trees2" {
                     asset::url("assets/pipeline.json/1/mat.json").unwrap()
-                } else if vegetation_type == "berries" {
-                    asset::url("assets/pipeline.json/2/mat.json").unwrap()
-                } else if vegetation_type == "trees2" {
-                    asset::url("assets/pipeline.json/3/mat.json").unwrap()
                 } else {
                     asset::url("assets/pipeline.json/0/mat.json").unwrap()
                 },
@@ -405,17 +378,14 @@ fn make_tiles() {
 
 #[main]
 pub async fn main() {
-    let mut last_player_position = vec3(0.0, 0.0, 0.0);
+    let last_player_position = vec3(0.0, 0.0, 0.0);
 
     make_lighting();
 
     register_augmentors();
     make_tiles();
     make_vegetation("trees");
-    //    make_vegetation("bush");
-    //    make_vegetation("mushrooms");
-    //     make_vegetation("berries");
-    //     make_vegetation("trees2");
+    make_vegetation("trees2");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {
