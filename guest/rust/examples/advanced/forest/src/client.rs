@@ -276,9 +276,9 @@ fn register_augmentors() {
 }
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (123456, 10),
-        "trees2" => (123460, 10),
-        "rocks" => (123457, 30),
+        "trees" => (123456, 30),
+        "trees2" => (123460, 30),
+        "rocks" => (123457, 60),
         _ => panic!("Invalid vegetation type"),
     };
 
@@ -314,8 +314,8 @@ fn make_vegetation(vegetation_type: &str) {
                 1,
             ),
             "rocks" => (
-                tooling::gen_rn(seed + i, 1.5, 3.0),
-                tooling::gen_rn(seed + i, 0.1, 2.0),
+                tooling::gen_rn(seed + i, 4.5, 5.0),
+                tooling::gen_rn(seed + i, 3.5, 5.0),
                 3,
                 tooling::gen_rn(seed + i, 0.3, 0.4),
                 tooling::gen_rn(seed + i, 60.0, 90.0),
@@ -326,8 +326,8 @@ fn make_vegetation(vegetation_type: &str) {
             _ => panic!("Invalid vegetation type"),
         };
 
-        let x = tooling::gen_rn(seed + i, 0.0, 5.0) * 2.0;
-        let y = tooling::gen_rn(seed + seed + i, 0.0, 5.0) * 2.0;
+        let x = tooling::gen_rn(seed + i, 0.0, 10.0) * 2.0;
+        let y = tooling::gen_rn(seed + seed + i, 0.0, 10.0) * 2.0;
         let position = vec3(x, y, tooling::get_height(x, y) * 2.0 - 0.1);
 
         let _id = Entity::new()
@@ -368,8 +368,8 @@ fn make_vegetation(vegetation_type: &str) {
 }
 
 fn make_tiles() {
-    let num_tiles_x = 5;
-    let num_tiles_y = 5;
+    let num_tiles_x = 10;
+    let num_tiles_y = 10;
     let size = 1.0;
     let seed = 123456;
 

@@ -32,13 +32,13 @@ pub fn main() {
     Entity::new()
         .with_merge(make_transformable())
         .with_default(water())
-        .with(scale(), Vec3::ONE * 10.)
+        .with(scale(), Vec3::ONE * 100.)
         .spawn();
 
     Entity::new()
         .with_merge(make_transformable())
         .with_default(sky())
-        .with(fog_density(), 1.0)
+        .with(fog_density(), 10.0)
         .spawn();
 
     spawn_query((player(), user_id())).bind(move |players| {
@@ -105,10 +105,10 @@ pub fn main() {
             let displace_z = h - pos.z;
 
             if displace != Vec3::ZERO {
-                println!(
-                    "x:{} y:{} z:{} h:{} d:{}",
-                    pos.x, pos.y, pos.z, h, displace_z
-                );
+                // println!(
+                //     "x:{} y:{} z:{} h:{} d:{}",
+                //     pos.x, pos.y, pos.z, h, displace_z
+                // );
                 displace = Vec3::new(displace.x, displace.y, displace_z);
             }
 
