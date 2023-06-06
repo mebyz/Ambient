@@ -253,7 +253,7 @@ fn build_tree_ramification(
             normals.push(vec3(x, y, z).normalize());
             uvs.push(vec2(j as f32 / sectors as f32, z / height));
 
-            if i < segments && j <= sectors {
+            if i < segments {
                 let current_index: u32 = (vertices.len() - 1) as u32;
                 let next_index: u32 = current_index + 1;
                 let next_row_index: u32 = current_index + vertices_per_row as u32;
@@ -261,7 +261,7 @@ fn build_tree_ramification(
 
                 if is_branch {
                     // For branches, create additional faces connecting the segments
-                    if j + 1 <= sectors {
+                    if j < sectors {
                         indices.push(current_index);
                         indices.push(next_index);
                         indices.push(next_row_index);
@@ -273,7 +273,7 @@ fn build_tree_ramification(
                     }
                 } else {
                     // For trunk, create faces as usual
-                    if j + 1 < sectors {
+                    if j < sectors {
                         indices.push(current_index);
                         indices.push(current_index + 1);
                         indices.push(next_row_index);
