@@ -278,6 +278,7 @@ fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
         "trees" => (123456, 10),
         "trees2" => (123460, 10),
+        "rocks" => (123457, 30),
         _ => panic!("Invalid vegetation type"),
     };
 
@@ -306,6 +307,16 @@ fn make_vegetation(vegetation_type: &str) {
                 tooling::gen_rn(seed + i, 2.5, 4.0),
                 tooling::gen_rn(seed + i, 1.0, 3.0),
                 tooling::gen_rn(seed + i, 6.0, 12.0) as u32,
+                tooling::gen_rn(seed + i, 0.3, 0.4),
+                tooling::gen_rn(seed + i, 60.0, 90.0),
+                1,
+                1.0,
+                1,
+            ),
+            "rocks" => (
+                tooling::gen_rn(seed + i, 1.5, 3.0),
+                tooling::gen_rn(seed + i, 0.1, 2.0),
+                3,
                 tooling::gen_rn(seed + i, 0.3, 0.4),
                 tooling::gen_rn(seed + i, 60.0, 90.0),
                 1,
@@ -345,6 +356,9 @@ fn make_vegetation(vegetation_type: &str) {
                 pbr_material_from_url(),
                 if vegetation_type == "trees2" {
                     asset::url("assets/pipeline.json/1/mat.json").unwrap()
+                } else
+                if vegetation_type == "rocks" {
+                    asset::url("assets/pipeline.json/3/mat.json").unwrap()
                 } else {
                     asset::url("assets/pipeline.json/0/mat.json").unwrap()
                 },
@@ -386,6 +400,7 @@ pub async fn main() {
     make_tiles();
     make_vegetation("trees");
     make_vegetation("trees2");
+    make_vegetation("rocks");
 
     let mut cursor_lock = input::CursorLockGuard::new(true);
     ambient_api::messages::Frame::subscribe(move |_| {
