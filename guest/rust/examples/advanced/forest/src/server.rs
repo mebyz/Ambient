@@ -5,14 +5,14 @@ use ambient_api::{
         ecs::{children, parent},
         physics::{
             character_controller_height, character_controller_radius, physics_controlled,
-            plane_collider,
+            plane_collider, sphere_collider,
         },
         player::{player, user_id},
         primitives::{cube, quad},
         rendering::{color, sky, water},
         transform::{local_to_parent, rotation, scale, translation},
     },
-    concepts::{make_perspective_infinite_reverse_camera, make_transformable},
+    concepts::{make_perspective_infinite_reverse_camera, make_transformable, make_sphere,},
     prelude::*,
 };
 
@@ -22,6 +22,28 @@ use components::{
 use std::f32::consts::{PI, TAU};
 
 mod tooling;
+
+fn make_vegetation(vegetation_type: &str) {
+    let (seed, num_vegetation) = match vegetation_type {
+        "trees" => (123456, 30),
+        "trees2" => (123460, 30),
+        "rocks" => (123457, 60),
+        _ => panic!("Invalid vegetation type"),
+    };
+
+    for i in 0..num_vegetation {
+        let x = tooling::gen_rn(seed + i, 0.0, 10.0) * 2.0;
+        let y = tooling::gen_rn(seed + seed + i, 0.0, 10.0) * 2.0;
+        let position = vec3(x, y, tooling::get_height(x, y) * 2.0 - 0.1);
+
+        Entity::new()
+        .with_merge(make_transformable())
+        .with_merge(make_sphere())
+        .with(sphere_collider(), 0.2)
+        .with(translation(), position)
+        .spawn();
+    }
+}
 
 #[main]
 pub fn main() {
@@ -40,6 +62,12 @@ pub fn main() {
         .with_default(sky())
         .with(fog_density(), 10.0)
         .spawn();
+
+
+        make_vegetation("trees");
+        make_vegetation("trees2");
+        make_vegetation("rocks");
+
 
     spawn_query((player(), user_id())).bind(move |players| {
         for (id, (_, uid)) in players {
