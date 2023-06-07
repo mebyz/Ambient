@@ -40,7 +40,7 @@ fn make_vegetation(vegetation_type: &str) {
         .with_merge(make_transformable())
         .with_merge(make_sphere())
         .with(scale(), Vec3::ONE * 0.1)
-        .width(color(), vec4(0.0, 0.0, 0.0, 0.0))
+        .with(color(), vec4(0.0, 0.0, 0.0, 0.0))
         .with(transparency_group(), 0)
         .with(sphere_collider(), 0.4)
         .with(translation(), position)
