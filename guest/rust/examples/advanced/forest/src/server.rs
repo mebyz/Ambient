@@ -34,7 +34,7 @@ fn make_vegetation(vegetation_type: &str) {
     for i in 0..num_vegetation {
         let x = tooling::gen_rn(seed + i, 0.0, 10.0) * 2.0;
         let y = tooling::gen_rn(seed + seed + i, 0.0, 10.0) * 2.0;
-        let position = vec3(x, y, tooling::get_height(x, y) * 2.0 - 0.1);
+        let position = vec3(x, y, tooling::get_height(x, y) * 2.0 + 1.0);
 
         Entity::new()
         .with_merge(make_transformable())
@@ -42,7 +42,7 @@ fn make_vegetation(vegetation_type: &str) {
         .with(scale(), Vec3::ONE * 0.1)
         .with(color(), vec4(0.0, 0.0, 0.0, 0.0))
         .with(transparency_group(), 0)
-        .with(sphere_collider(), 0.4)
+        .with(sphere_collider(), 5.0)
         .with(translation(), position)
         .spawn();
     }
