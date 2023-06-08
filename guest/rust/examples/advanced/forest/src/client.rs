@@ -36,18 +36,29 @@ fn make_camera() {
         .spawn();
 }
 
+// #[element_component]
+// fn App(_hooks: &mut Hooks, sun_id: EntityId) -> Element {
+//     FocusRoot::el([FlowColumn::el([FlowRow::el([Button::new(
+//         "Toggle sun rotation",
+//         move |_| {
+//             entity::mutate_component(sun_id, rotating_sun(), |rotating_sun| {
+//                 *rotating_sun = !*rotating_sun;
+//             });
+//         },
+//     )
+//     .el()])])
+//     .with_padding_even(10.0)])
+// }
+
+
 #[element_component]
-fn App(_hooks: &mut Hooks, sun_id: EntityId) -> Element {
-    FocusRoot::el([FlowColumn::el([FlowRow::el([Button::new(
-        "Toggle sun rotation",
-        move |_| {
-            entity::mutate_component(sun_id, rotating_sun(), |rotating_sun| {
-                *rotating_sun = !*rotating_sun;
-            });
-        },
-    )
-    .el()])])
-    .with_padding_even(10.0)])
+fn App(_hooks: &mut Hooks, position: Vec3, text: String) -> Element {
+    Text::el(text)
+        .with(
+            translation(),
+            position,
+        )
+        .with(color(), Vec4::ONE)
 }
 
 fn make_lighting() {
@@ -63,7 +74,7 @@ fn make_lighting() {
         .with_default(main_scene())
         .with(rotating_sun(), false)
         .spawn();
-    App::el(sun_id).spawn_interactive();
+    //App::el(sun_id).spawn_interactive();
     query((rotation(), (rotating_sun())))
         .requires(sun())
         .each_frame(move |suns| {
@@ -332,6 +343,20 @@ fn make_vegetation(vegetation_type: &str) {
 
         let plant_name = generate_plant_name_extended(&PlantParameters { parts: [trunk_segments as f32 - trunk_radius, trunk_radius, trunk_segments as f32], rgb: (trunk_segments as f32 * trunk_radius, trunk_radius* trunk_radius, trunk_segments as f32 * trunk_radius), size: trunk_height});
         println!("Plant Name: {}", plant_name);
+
+        //App::el(position, plant_name.clone()).spawn_interactive();
+
+        Entity::new()
+        .with_merge(make_transformable())
+        .with(text(), plant_name.clone())
+        .with(color(), vec4(1., 1., 1., 1.))
+        .with(translation(), position)
+        .with(scale(), Vec3::ONE* 0.005)
+        .with_default(local_to_world())
+        .with_default(mesh_to_local())
+        .with_default(mesh_to_world())
+        .with_default(main_scene())
+        .spawn();
 
         let _id = Entity::new()
             .with_merge(concepts::make_tree())
