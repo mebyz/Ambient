@@ -25,15 +25,15 @@ mod tooling;
 
 fn make_vegetation(vegetation_type: &str) {
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (123456, 30),
-        "trees2" => (123460, 30),
-        "rocks" => (123457, 60),
+        "trees" => (123456, 1),
+        // "trees2" => (123460, 30),
+        // "rocks" => (123457, 60),
         _ => panic!("Invalid vegetation type"),
     };
 
     for i in 0..num_vegetation {
         let x = tooling::gen_rn(seed + i, 0.0, 10.0) * 2.0;
-        let y = tooling::gen_rn(seed + seed + i, 0.0, 10.0) * 2.0;
+        let y = tooling::gen_rn(seed + i + 1, 0.0, 10.0) * 2.0;
         let position = vec3(x, y, tooling::get_height(x, y) * 2.0 + 1.0);
 
         Entity::new()
@@ -68,8 +68,8 @@ pub fn main() {
 
 
         make_vegetation("trees");
-        make_vegetation("trees2");
-        make_vegetation("rocks");
+        //make_vegetation("trees2");
+        //make_vegetation("rocks");
 
 
     spawn_query((player(), user_id())).bind(move |players| {

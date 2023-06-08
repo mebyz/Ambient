@@ -17,18 +17,205 @@ const TAU: f32 = std::f32::consts::TAU;
 const WAVE_AMPLITUDE: f32 = 0.25;
 const WAVE_FREQUENCY: f32 = 0.5 * TAU;
 
+
+struct PlantParameters {
+    pub parts: [f32; 3],
+    rgb: (f32, f32, f32),
+    size: f32,
+}
+
+
+#[derive(Clone, Copy)]
+pub struct Sprout {
+    pub seed: i32,
+    pub trunk_radius_is_fixed: bool,
+    pub trunk_radius_min: f32,
+    pub trunk_radius_max: f32,
+    pub trunk_height_is_fixed: bool,
+    pub trunk_height_min: f32,
+    pub trunk_height_max: f32,
+    pub trunk_segments_is_fixed: bool,
+    pub trunk_segments_min: f32,
+    pub trunk_segments_max: f32,
+
+}
+
+impl Default for Sprout {
+    fn default() -> Sprout {
+        Sprout {
+            seed: 0,
+            trunk_radius_is_fixed: false,
+            trunk_radius_min: 0.1,
+            trunk_radius_max: 0.2,
+            trunk_height_is_fixed: false,
+            trunk_height_min: 0.1,
+            trunk_height_max: 0.2,
+            trunk_segments_is_fixed: false,
+            trunk_segments_min: 0.1,
+            trunk_segments_max: 0.2,
+        }
+    }
+}
+
+impl Sprout {
+    pub fn new( seed : i32, trunk_radius_is_fixed: bool, trunk_radius_min: f32, trunk_radius_max: f32,
+                trunk_height_is_fixed: bool, trunk_height_min: f32, trunk_height_max: f32,
+                trunk_segments_is_fixed: bool, trunk_segments_min: f32, trunk_segments_max: f32
+            ) -> Self {
+        Self {
+            seed,
+            trunk_radius_is_fixed,
+            trunk_radius_min,
+            trunk_radius_max,
+            trunk_height_is_fixed,
+            trunk_height_min,
+            trunk_height_max,
+            trunk_segments_is_fixed,
+            trunk_segments_min,
+            trunk_segments_max,
+        }
+    }
+}
+
+
+pub fn get_radius(seed: Sprout) -> f32 {
+    match seed.trunk_radius_is_fixed {
+        true => seed.trunk_radius_min,
+        false => tooling::gen_rn(seed.seed, seed.trunk_radius_min, seed.trunk_radius_max)
+    }
+}
+
+pub fn get_height(seed: Sprout) -> f32 {
+    match seed.trunk_height_is_fixed {
+        true => seed.trunk_height_min,
+        false => tooling::gen_rn(seed.seed, seed.trunk_height_min, seed.trunk_height_max)
+    }
+}
+
+pub fn get_segments(seed: Sprout) -> u32 {
+    match seed.trunk_segments_is_fixed {
+        true => seed.trunk_segments_min as u32,
+        false => tooling::gen_rn(seed.seed, seed.trunk_segments_min, seed.trunk_segments_max) as u32
+    }
+}
+
+pub fn get_name(seed: Sprout) -> String {
+
+    let params = &PlantParameters { parts: [seed.trunk_radius_max - seed.trunk_radius_min, seed.trunk_radius_max, seed.trunk_radius_min], rgb: (seed.trunk_radius_max, seed.trunk_radius_max, seed.trunk_radius_max), size: seed.trunk_radius_max};
+
+    let name_parts = [
+        "Abe", "Bo", "Cep", "De", "Eso", "Fo", "Gal", "Hu", "Igu", "Je", "Ko", "La",
+        "Me", "Nu", "Ora", "Pe", "Qua", "Re", "Si", "Tu", "Ubi", "Ve", "Xa", "Ypo", "Za",
+        "Bra", "Cho", "Dre", "Era", "Fra", "Glo", "Hem", "Iri", "Jor", "Kro", "Lum",
+        "Nix", "Ovo", "Pex", "Qui", "Rex", "Sco", "Tal", "Ulu", "Vex", "Wra", "Xor",
+        "Yar", "Zyr", "Blu", "Cli", "Dus", "Ech", "Fli", "Gai", "Hym", "Inc", "Jar",
+        "Kai", "Lyn", "Myr", "Neb", "Oxy", "Plu", "Qui", "Rai", "Sly", "Twi", "Uma",
+        "Val", "Win", "Xan", "Ygg", "Zen",
+    ];
+
+    let suffixes = [
+        "us", "a", "um", "is", "orum", "arum", "er", "ra", "ris", "tas", "tis", "ensis", "icus",
+        "oides", "ens", "iensis", "alis", "inus", "icus", "ivus", "icus", "icus", "atus", "ivus",
+        "ax", "alis", "aris", "arius", "oides", "ax", "ensis", "ata", "ina", "osa", "ella", "illa",
+        "ina", "ata", "ora", "ura", "yra", "ara", "ica", "ina", "ona", "onia", "osus", "ax",
+        "aria", "ata", "atum", "atum", "a", "ata", "ota", "ura", "ata", "ida", "ula", "ora",
+    ];
+
+    let colors = [
+        ("Niger", (1, 1, 1)),          // Black
+        ("Atramentum", (76, 83, 88)),  // Ink
+        ("Purpureus", (128, 0, 128)),  // Purple
+        ("Ruber", (255, 0, 0)),        // Red
+        ("Roseus", (255, 102, 204)),   // Pink
+        ("Albus", (255, 255, 255)),    // White
+        ("Luteus", (204, 204, 0)),     // Yellow
+        ("Caeruleus", (0, 0, 255)),     // Blue
+        ("Viridis", (0, 128, 0)),      // Green
+        ("Aureus", (255, 215, 0)),     // Golden
+        ("Cyanus", (0, 255, 255)),     // Cyan
+        ("Rubinus", (158, 14, 64)),    // Ruby
+    ];
+
+    let sizes = [
+        ("Humilis", 1.5),
+        ("Minimus", 2.5),
+        ("Parvus", 3.0),
+        ("Brevis", 4.0),
+        ("Minor", 5.0),
+        ("Medius", 7.5),
+        ("Grandis", 12.0),
+        ("Amplus", 14.0),
+        ("Maximus", 15.0),
+        ("Longus", 18.0),
+        ("Magnus", 20.0),
+    ];
+
+    let mut name = String::new();
+    let mut last_index = 0;
+    for &part in &params.parts {
+        let index = (part /* * name_parts.len() as f32 */) as usize;
+
+        if index < name_parts.len() {
+            name.push_str(name_parts[index]);
+            last_index = index;
+        }
+    }
+    name.push_str(suffixes[last_index]);
+
+    let (color_name, _) = colors
+        .iter()
+        .min_by_key(|(_, color)| {
+            let (r_diff, g_diff, b_diff) = (
+                (params.rgb.0 as f32 - color.0 as f32) as i32,
+                (params.rgb.1 as f32 - color.1 as f32) as i32,
+                (params.rgb.2 as f32 - color.2 as f32) as i32,
+            );
+            r_diff * r_diff + g_diff * g_diff + b_diff * b_diff
+        })
+        .unwrap();
+    name.push(' ');
+    name.push_str(color_name);
+
+    let (size_word, _) = sizes
+        .iter()
+        .min_by_key(|(_, value)| (params.size - value).abs() as i32)
+        .unwrap();
+    name.push(' ');
+    name.push_str(size_word);
+
+    name
+        .chars()
+        .enumerate()
+        .map(|(i, c)| {
+            if i == 0 {
+                c.to_uppercase().to_string()
+            } else {
+                c.to_lowercase().to_string()
+            }
+        })
+        .collect()
+}
+
 #[derive(Clone)]
 pub struct TreeMesh {
+    //pub sprout : Sprout,
     pub seed: i32,
     pub trunk_radius: f32,
     pub trunk_height: f32,
     pub trunk_segments: u32,
-    pub branch_length: f32,
-    pub branch_angle: f32,
-    pub branch_segments: u32,
-    pub foliage_radius: f32,
-    pub foliage_density: u32,
-    pub foliage_segments: u32,
+}
+
+
+impl Default for TreeMesh {
+    fn default() -> TreeMesh {
+        TreeMesh {
+            //sprout : Sprout::default(),
+            seed: 0,
+            trunk_radius: 0.1,
+            trunk_height: 0.5,
+            trunk_segments: 8,
+        }
+    }
 }
 
 pub fn create_tree(mut tree: TreeMesh) -> mesh_descriptor::MeshDescriptor {
