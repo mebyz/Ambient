@@ -1,4 +1,6 @@
 use ambient_api::{client::mesh, mesh::Vertex, prelude::*};
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
 
 #[path = "../tooling/mod.rs"]
 mod tooling;
@@ -25,7 +27,7 @@ struct PlantParameters {
 }
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Sprout {
     pub seed: i32,
     pub trunk_radius_is_fixed: bool,
@@ -97,6 +99,16 @@ pub fn get_segments(seed: Sprout) -> u32 {
         true => seed.trunk_segments_min as u32,
         false => tooling::gen_rn(seed.seed, seed.trunk_segments_min, seed.trunk_segments_max) as u32
     }
+}
+
+pub fn get_dna(seed: Sprout) -> String {
+    let d = serde_json::to_string(&seed).unwrap();
+    d
+}
+
+pub fn from_dna(d: String) -> Sprout {
+    let s: Sprout = serde_json::from_str(&d).unwrap();
+    s
 }
 
 pub fn get_name(seed: Sprout) -> String {
@@ -197,8 +209,8 @@ pub fn get_name(seed: Sprout) -> String {
 }
 
 #[derive(Clone)]
-pub struct TreeMesh {
-    //pub sprout : Sprout,
+pub struct TreeMesh<'a> {
+    pub sprout : &'a str,
     pub seed: i32,
     pub trunk_radius: f32,
     pub trunk_height: f32,
@@ -206,10 +218,10 @@ pub struct TreeMesh {
 }
 
 
-impl Default for TreeMesh {
-    fn default() -> TreeMesh {
+impl<'a> Default for TreeMesh<'a> {
+    fn default() -> TreeMesh<'a> {
         TreeMesh {
-            //sprout : Sprout::default(),
+            sprout : "",
             seed: 0,
             trunk_radius: 0.1,
             trunk_height: 0.5,

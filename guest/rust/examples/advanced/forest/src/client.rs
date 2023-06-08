@@ -208,6 +208,7 @@ fn register_augmentors() {
         {
 
             let tree = tree::create_tree(tree::TreeMesh {
+                sprout:"",
                 seed,
                 trunk_radius,
                 trunk_height,
@@ -312,6 +313,9 @@ fn make_vegetation(vegetation_type: &str) {
 
     let plant_name = tree::get_name(seed);
     println!("Plant name: {}", plant_name);
+
+    let dna = tree::get_dna(seed);
+    println!("DNA: {}", dna);
 
     Entity::new()
     .with_merge(make_transformable())
