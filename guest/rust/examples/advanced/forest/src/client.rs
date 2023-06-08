@@ -194,6 +194,7 @@ fn register_augmentors() {
         components::tree_trunk_height(),
         components::tree_trunk_radius(),
         components::tree_trunk_segments(),
+        components::tree_sprout(),
     ))
     .bind(move |trees| {
         for (
@@ -203,16 +204,18 @@ fn register_augmentors() {
                 trunk_height,
                 trunk_radius,
                 trunk_segments,
+                sprout,
             ),
         ) in trees
         {
 
             let tree = tree::create_tree(tree::TreeMesh {
-                sprout:"",
                 seed,
                 trunk_radius,
                 trunk_height,
-                trunk_segments});
+                trunk_segments,
+                sprout,
+            });
 
             let mesh = mesh::create(&mesh::Descriptor {
                 vertices: &tree.vertices,
@@ -282,15 +285,17 @@ fn make_vegetation(vegetation_type: &str) {
     //    trunk_segments_is_fixed: bool, trunk_segments_min: f32, trunk_segments_max: f32
     //)
 
-    let sprout1 = tree::Sprout::new(123456, false, 10.0, 15.0, false, 10.0, 15.0, false, 10.0, 15.0);
+    let sprout1 = tree::Sprout::new(123456, false, 3.0, 5.0, false, 10.0, 25.0, false, 10.0, 15.0);
     let sprout2 = tree::Sprout::new(123457, false, 1.0, 2.0, false, 3.0, 5.0, false, 10.0, 15.0);
     let sprout3 = tree::Sprout::new(123458, false, 1.0, 3.0, false, 5.0, 10.0, false, 5.0, 7.0);
+    let sprout4 = tree::Sprout::new(123459, false, 10.0, 15.0, false, 5.0, 10.0, false, 5.0, 17.0);
 
     //This is our field of vegetation
     let (seed, num_vegetation) = match vegetation_type {
-        "trees" => (sprout1, 3),
-        "trees2" => (sprout2, 30),
-        "trees3" => (sprout3, 3),
+        "trees" => (sprout1, 5),
+        "trees2" => (sprout2, 5),
+        "trees3" => (sprout3, 5),
+        "trees4" => (sprout3, 5),
         _ => panic!("Invalid vegetation type"),
     };
 
@@ -306,10 +311,11 @@ fn make_vegetation(vegetation_type: &str) {
             );
 
 
-    let x = tooling::gen_rn(seed.seed+i, 0.0, 10.0) * 2.0;
-    let y = tooling::gen_rn(seed.seed+i+1, 0.0, 10.0) * 2.0;
+    let x = tooling::gen_rn(seed.seed*2+i, 0.0, 10.0) * 2.0;
+    let y = tooling::gen_rn(seed.seed*3*i+1, 0.0, 10.0) * 2.0;
 
     let position = vec3(x, y, tooling::get_height(x, y) * 2.0 - 0.1);
+    let text_position = vec3(position.x + 0.0, position.y, position.z + 1.0);
 
     let plant_name = tree::get_name(seed);
     println!("Plant name: {}", plant_name);
@@ -321,8 +327,12 @@ fn make_vegetation(vegetation_type: &str) {
     .with_merge(make_transformable())
     .with(text(), plant_name.clone())
     .with(color(), vec4(1., 1., 1., 1.))
-    .with(translation(), position)
-    .with(scale(), Vec3::ONE* 0.005)
+    .with(translation(), text_position)
+    .with(
+        rotation(),
+        Quat::from_rotation_y(-90_f32.to_radians())
+    )
+    .with(scale(), Vec3::ONE* 0.01)
     .with_default(local_to_world())
     .with_default(mesh_to_local())
     .with_default(mesh_to_world())
@@ -344,6 +354,7 @@ fn make_vegetation(vegetation_type: &str) {
         )
         .with(translation(), position)
         .with(components::tree_seed(), seed.seed + i)
+        .with(components::tree_sprout(), dna)
         .with(components::tree_trunk_radius(), trunk_radius)
         .with(components::tree_trunk_height(), trunk_height)
         .with(components::tree_trunk_segments(), trunk_segments)

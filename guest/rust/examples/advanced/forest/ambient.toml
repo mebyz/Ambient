@@ -14,6 +14,7 @@ tree_seed = { type = "I32", name = "Tree seed", description = "The seed of the t
 tree_trunk_radius = { type = "F32", name = "Tree trunk radius", description = "The radius of the trunk" }
 tree_trunk_height = { type = "F32", name = "Tree trunk height", description = "The height of the trunk" }
 tree_trunk_segments = { type = "U32", name = "Tree trunk segments", description = "The number of segments of the trunk" }
+tree_sprout = { type = "String", name = "Tree dna of the sprout", description = "The dna of the tree" }
 tree_branch_length = { type = "F32", name = "Tree branches lenght", description = "The lenght of the branches" }
 player_head_ref = { type = "EntityId", name = "Player head ref", description = "The player's head.", attributes = [
     "Debuggable",
@@ -36,6 +37,7 @@ tile_y = 0
 
 [concepts.tree.components]
 tree_seed = 123
+tree_sprout = ""
 tree_trunk_radius = 3.0
 tree_trunk_height = 15.0
 tree_trunk_segments = 8

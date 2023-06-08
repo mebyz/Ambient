@@ -74,11 +74,10 @@ impl Sprout {
             trunk_height_max,
             trunk_segments_is_fixed,
             trunk_segments_min,
-            trunk_segments_max,
+            trunk_segments_max
         }
     }
 }
-
 
 pub fn get_radius(seed: Sprout) -> f32 {
     match seed.trunk_radius_is_fixed {
@@ -209,8 +208,8 @@ pub fn get_name(seed: Sprout) -> String {
 }
 
 #[derive(Clone)]
-pub struct TreeMesh<'a> {
-    pub sprout : &'a str,
+pub struct TreeMesh {
+    pub sprout : String,
     pub seed: i32,
     pub trunk_radius: f32,
     pub trunk_height: f32,
@@ -218,10 +217,10 @@ pub struct TreeMesh<'a> {
 }
 
 
-impl<'a> Default for TreeMesh<'a> {
-    fn default() -> TreeMesh<'a> {
+impl<'a> Default for TreeMesh {
+    fn default() -> TreeMesh {
         TreeMesh {
-            sprout : "",
+            sprout : "".to_string(),
             seed: 0,
             trunk_radius: 0.1,
             trunk_height: 0.5,
