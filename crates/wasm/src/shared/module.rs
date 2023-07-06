@@ -1,11 +1,15 @@
-use std::{any::Any, collections::HashSet, sync::Arc};
+use crate::shared;
 
+use super::Source;
+#[cfg(feature = "wit")]
+use super::{bindings::BindingsBound, conversion::IntoBindgen};
 use ambient_ecs::{EntityId, World};
 use data_encoding::BASE64;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-
-use super::{bindings::BindingsBound, conversion::IntoBindgen, message::Source, wit};
+use std::{any::Any, collections::HashSet, sync::Arc};
+#[cfg(feature = "wit")]
+use wasmtime_wasi::preview2 as wasi_preview2;
 
 #[derive(Clone)]
 pub struct ModuleBytecode(pub Vec<u8>);
@@ -64,9 +68,29 @@ impl<'de> Deserialize<'de> for ModuleBytecode {
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct ModuleErrors(pub Vec<String>);
 
-struct WasmContext<Bindings: BindingsBound> {
-    wasi: wasmtime_wasi::WasiCtx,
+#[cfg(feature = "wit")]
+struct WasmtimeContext<Bindings: BindingsBound> {
     bindings: Bindings,
+    wasi: wasi_preview2::WasiCtx,
+    table: wasi_preview2::Table,
+}
+#[cfg(feature = "wit")]
+impl<B: BindingsBound> wasi_preview2::WasiView for WasmtimeContext<B> {
+    fn table(&self) -> &wasi_preview2::Table {
+        &self.table
+    }
+
+    fn table_mut(&mut self) -> &mut wasi_preview2::Table {
+        &mut self.table
+    }
+
+    fn ctx(&self) -> &wasi_preview2::WasiCtx {
+        &self.wasi
+    }
+
+    fn ctx_mut(&mut self) -> &mut wasi_preview2::WasiCtx {
+        &mut self.wasi
+    }
 }
 
 pub trait ModuleStateBehavior: Sync + Send {
@@ -98,6 +122,7 @@ pub struct ModuleState {
     inner: Arc<RwLock<dyn ModuleStateBehavior>>,
 }
 impl ModuleState {
+    #[cfg(feature = "wit")]
     fn new<Bindings: BindingsBound + 'static>(
         args: ModuleStateArgs<'_>,
         bindings: fn(EntityId) -> Bindings,
@@ -119,9 +144,10 @@ impl ModuleState {
         })
     }
 
+    #[cfg(feature = "wit")]
     pub fn create_state_maker<Bindings: BindingsBound + 'static>(
         bindings: fn(EntityId) -> Bindings,
-    ) -> Arc<dyn Fn(ModuleStateArgs<'_>) -> anyhow::Result<Self> + Sync + Send> {
+    ) -> Arc<dyn Fn(ModuleStateArgs<'_>) -> anyhow::Result<ModuleState> + Send + Sync> {
         Arc::new(move |args: ModuleStateArgs<'_>| Self::new(args, bindings))
     }
 }
@@ -151,21 +177,25 @@ impl ModuleStateBehavior for ModuleState {
     }
 }
 
+#[cfg(feature = "wit")]
 struct ModuleStateInnerImpl<Bindings: BindingsBound> {
-    store: wasmtime::Store<WasmContext<Bindings>>,
+    store: wasmtime::Store<WasmtimeContext<Bindings>>,
 
-    guest_bindings: wit::Bindings,
+    guest_bindings: shared::wit::Bindings,
     _guest_instance: wasmtime::component::Instance,
 
     stdout_consumer: WasiOutputStreamConsumer,
     stderr_consumer: WasiOutputStreamConsumer,
 }
 
+#[cfg(feature = "wit")]
 impl<Bindings: BindingsBound> std::fmt::Debug for ModuleStateInnerImpl<Bindings> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleStateInner").finish()
+        f.debug_struct("ModuleStateInner").finish_non_exhaustive()
     }
 }
+
+#[cfg(feature = "wit")]
 impl<Bindings: BindingsBound> ModuleStateInnerImpl<Bindings> {
     fn new(
         component_bytecode: &[u8],
@@ -177,28 +207,38 @@ impl<Bindings: BindingsBound> ModuleStateInnerImpl<Bindings> {
 
         let (stdout_output, stdout_consumer) = WasiOutputStream::make(stdout_output);
         let (stderr_output, stderr_consumer) = WasiOutputStream::make(stderr_output);
+        let mut table = wasi_preview2::Table::new();
+        let wasi = wasi_preview2::WasiCtxBuilder::new()
+            .set_stdout(stdout_output)
+            .set_stderr(stderr_output)
+            .build(&mut table)?;
         let mut store = wasmtime::Store::new(
             engine,
-            WasmContext {
-                wasi: wasi_cap_std_sync::WasiCtxBuilder::new()
-                    .stdout(stdout_output)
-                    .stderr(stderr_output)
-                    .build(),
+            WasmtimeContext {
+                wasi,
                 bindings,
+                table,
             },
         );
 
-        let mut linker = wasmtime::component::Linker::<WasmContext<Bindings>>::new(engine);
-        wasmtime_wasi::command::add_to_linker(&mut linker, |x| &mut x.wasi)?;
-        wit::Bindings::add_to_linker(&mut linker, |x| &mut x.bindings)?;
+        let mut linker = wasmtime::component::Linker::<WasmtimeContext<Bindings>>::new(engine);
+        wasi_preview2::wasi::command::add_to_linker(&mut linker)?;
+        shared::wit::Bindings::add_to_linker(&mut linker, |x| &mut x.bindings)?;
 
         let component = wasmtime::component::Component::from_binary(engine, component_bytecode)?;
 
-        let (guest_bindings, guest_instance) =
-            wit::Bindings::instantiate(&mut store, &component, &linker)?;
+        let (guest_bindings, guest_instance) = pollster::block_on(async {
+            let (guest_bindings, guest_instance) =
+                shared::wit::Bindings::instantiate_async(&mut store, &component, &linker).await?;
 
-        // Initialise the runtime.
-        guest_bindings.guest().call_init(&mut store)?;
+            // // Initialise the runtime.
+            guest_bindings
+                .ambient_bindings_guest()
+                .call_init(&mut store)
+                .await?;
+
+            anyhow::Ok((guest_bindings, guest_instance))
+        })?;
 
         Ok(Self {
             store,
@@ -210,6 +250,8 @@ impl<Bindings: BindingsBound> ModuleStateInnerImpl<Bindings> {
         })
     }
 }
+
+#[cfg(feature = "wit")]
 impl<Bindings: BindingsBound> ModuleStateBehavior for ModuleStateInnerImpl<Bindings> {
     fn run(
         &mut self,
@@ -220,17 +262,18 @@ impl<Bindings: BindingsBound> ModuleStateBehavior for ModuleStateInnerImpl<Bindi
     ) -> anyhow::Result<()> {
         self.store.data_mut().bindings.set_world(world);
 
-        let result = self.guest_bindings.guest().call_exec(
+        let guest = &self.guest_bindings.ambient_bindings_guest();
+        let result = pollster::block_on(guest.call_exec(
             &mut self.store,
-            match message_source {
-                Source::Runtime => wit::guest::SourceParam::Runtime,
-                Source::Server => wit::guest::SourceParam::Server,
-                Source::Client(user_id) => wit::guest::SourceParam::Client(user_id),
-                Source::Local(module) => wit::guest::SourceParam::Local(module.into_bindgen()),
+            &match message_source {
+                Source::Runtime => shared::wit::guest::Source::Runtime,
+                Source::Server => shared::wit::guest::Source::Server,
+                Source::Client(user_id) => shared::wit::guest::Source::Client(user_id.clone()),
+                Source::Local(module) => shared::wit::guest::Source::Local(module.into_bindgen()),
             },
             message_name,
             message_data,
-        );
+        ));
 
         self.store.data_mut().bindings.clear_world();
 
@@ -267,10 +310,10 @@ struct WasiOutputStream(flume::Sender<String>);
 impl WasiOutputStream {
     fn make(
         outputter: Box<dyn Fn(&World, &str) + Sync + Send>,
-    ) -> (Box<Self>, WasiOutputStreamConsumer) {
+    ) -> (Self, WasiOutputStreamConsumer) {
         let (tx, rx) = flume::unbounded();
         (
-            Box::new(Self(tx)),
+            Self(tx),
             WasiOutputStreamConsumer {
                 rx,
                 outputter,
@@ -281,20 +324,20 @@ impl WasiOutputStream {
 }
 
 #[async_trait::async_trait]
-impl wasi_common::OutputStream for WasiOutputStream {
+#[cfg(feature = "native")]
+impl wasi_preview2::OutputStream for WasiOutputStream {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    async fn writable(&self) -> Result<(), wasi_common::Error> {
+    async fn writable(&self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
-    async fn write(&mut self, buf: &[u8]) -> Result<u64, wasi_common::Error> {
-        let msg = std::str::from_utf8(buf).map_err(|e| wasi_common::Error::trap(e.into()))?;
-        self.0
-            .send(msg.to_string())
-            .map_err(|e| wasi_common::Error::trap(e.into()))?;
+    async fn write(&mut self, buf: &[u8]) -> Result<u64, anyhow::Error> {
+        let msg = std::str::from_utf8(buf)?;
+        self.0.send(msg.to_string())?;
+
         Ok(buf.len().try_into()?)
     }
 }
@@ -304,6 +347,7 @@ struct WasiOutputStreamConsumer {
     outputter: Box<dyn Fn(&World, &str) + Sync + Send>,
     buffer: String,
 }
+
 impl WasiOutputStreamConsumer {
     fn process_incoming(&mut self, world: &World) {
         for msg in self.rx.drain() {

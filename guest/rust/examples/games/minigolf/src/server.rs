@@ -268,10 +268,10 @@ pub fn main() {
 
     ambient_api::messages::Collision::subscribe(move |msg| {
         // TODO: change msg.ids[0] to the bouncing ball
-        messages::Bonk::new(msg.ids[0]).send_client_broadcast_reliable();
+        messages::Bonk::new(msg.ids[0]).send_client_broadcast_unreliable();
     });
 
-    let start_time = time();
+    let start_time = game_time();
 
     // Update player ball each frame.
     query((
@@ -311,7 +311,7 @@ pub fn main() {
             };
 
             let force_multiplier = {
-                let mut mul = (time() - start_time).as_secs_f32() % 2.0;
+                let mut mul = (game_time() - start_time).as_secs_f32() % 2.0;
                 if mul > 1.0 {
                     mul = 1.0 - (mul - 1.0);
                 }
@@ -370,7 +370,7 @@ pub fn main() {
                         linear_velocity(),
                         camera_direction * 50. * force_multiplier,
                     );
-                    messages::Hit::new(player_ball).send_client_broadcast_reliable();
+                    messages::Hit::new(player_ball).send_client_broadcast_unreliable();
                     let stroke_count = entity::get_component(player, player_stroke_count())
                         .unwrap_or_default()
                         + 1;
@@ -385,7 +385,7 @@ pub fn main() {
                 let lv = entity::get_component(player_ball, linear_velocity()).unwrap_or_default();
                 let lvl = lv.length();
                 if lvl > 0.0 && !is_vertically_moving(lv) {
-                    -65.0 * frametime() * lv.xy().extend(0.0) * (1.0 / lvl)
+                    -65.0 * delta_time() * lv.xy().extend(0.0) * (1.0 / lvl)
                 } else {
                     Vec3::ZERO
                 }

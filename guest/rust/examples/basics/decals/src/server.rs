@@ -3,7 +3,7 @@ use ambient_api::{
         app::main_scene,
         camera::aspect_ratio_from_window,
         primitives::{cube, quad},
-        rendering::{color, transparency_group},
+        rendering::{color, decal_from_url, transparency_group},
         transform::{lookat_target, rotation, scale, translation},
     },
     concepts::make_perspective_infinite_reverse_camera,
@@ -41,7 +41,7 @@ pub fn main() {
     // Decal projection volume.
     let decal_scale = vec3(1.0, 1.0, 1.0);
     let decal_rotation = Quat::from_rotation_z(PI / 4.0);
-    let decal_url = asset::url("assets/pipeline.json/0/mat.json").unwrap();
+    let decal_url = asset::url("assets/pipeline.toml/0/mat.json").unwrap();
     Entity::new()
         .with(rotation(), decal_rotation)
         .with(scale(), decal_scale)

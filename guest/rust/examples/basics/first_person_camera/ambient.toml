@@ -1,11 +1,21 @@
-[project]
-id = "first_person_camera"
+[ember]
+id = "ambient_example_first_person_camera"
 name = "First person camera"
 version = "0.0.1"
+repository = "https://github.com/AmbientRun/Ambient/tree/main/guest/rust/examples/basics/first_person_camera"
+type = "Game"
+categories = ["Example"]
 
 [components]
+
+ball_ref = { type = "EntityId", name = "Ball ref", description = "The ball entity.", attributes = [
+    "Debuggable",
+    "Networked"
+] }
+
 player_head_ref = { type = "EntityId", name = "Player head ref", description = "The player's head.", attributes = [
     "Debuggable",
+    "Networked"
 ] }
 player_movement_direction = { type = "Vec2", name = "Player movement direction", description = "The player's movement direction.", attributes = [
     "Debuggable",

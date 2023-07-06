@@ -1,6 +1,7 @@
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -28,7 +29,7 @@ pub const ASSETS_PROTOCOL_SCHEME: &str = "ambient-assets";
 pub struct ServerBaseUrlKey;
 impl SyncAssetKey<AbsAssetUrl> for ServerBaseUrlKey {
     fn load(&self, _assets: AssetCache) -> AbsAssetUrl {
-        AbsAssetUrl::parse("http://localhost:8999/content/").unwrap()
+        AbsAssetUrl::from_str("http://localhost:8999/content/").unwrap()
     }
 }
 
@@ -52,25 +53,30 @@ impl std::fmt::Debug for AbsAssetUrl {
         write!(f, "{}", self.0.as_str())
     }
 }
+
 impl std::fmt::Display for AbsAssetUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.as_str())
     }
 }
-impl AbsAssetUrl {
-    /// This will also resolve relative local paths
-    pub fn parse(url: impl AsRef<str>) -> anyhow::Result<Self> {
-        match Url::parse(url.as_ref()) {
+impl FromStr for AbsAssetUrl {
+    type Err = anyhow::Error;
+
+    fn from_str(url: &str) -> Result<Self, Self::Err> {
+        // This will also resolve relative local paths
+        match Url::parse(url) {
             Ok(url) => Ok(Self(url)),
             Err(ParseError::RelativeUrlWithoutBase) => Ok(Self(Url::parse(&format!(
                 "file://{}/{}",
                 std::env::current_dir().unwrap().to_str().unwrap(),
-                url.as_ref()
+                url
             ))?)),
             Err(err) => Err(err.into()),
         }
     }
+}
 
+impl AbsAssetUrl {
     #[cfg(target_os = "unknown")]
     pub fn from_file_path(_: impl AsRef<Path>) -> Self {
         unimplemented!("Url::from_file_path")
@@ -164,13 +170,13 @@ impl AbsAssetUrl {
         }
     }
     pub fn resolve(&self, url_or_relative_path: impl AsRef<str>) -> Result<Self, ParseError> {
-        AssetUrl::parse(url_or_relative_path)?.resolve(self)
+        AssetUrl::from_str(url_or_relative_path.as_ref())?.resolve(self)
     }
-    /// This appends [path] to the current path, with a `/` joining them
+    /// This appends `path` to the current path, with a `/` joining them
     pub fn push(&self, path: impl AsRef<str>) -> Result<Self, ParseError> {
         Ok(AbsAssetUrl(self.as_directory().0.join(path.as_ref())?))
     }
-    /// This joins the current url with a relative path. See https://docs.rs/url/latest/url/struct.Url.html#method.join for details how it works
+    /// This joins the current url with a relative path. See <https://docs.rs/url/latest/url/struct.Url.html#method.join> for details on how it works
     pub fn join(&self, path: impl AsRef<str>) -> Result<Self, ParseError> {
         Ok(AbsAssetUrl(self.0.join(path.as_ref())?))
     }
@@ -269,7 +275,9 @@ impl AbsAssetUrl {
             let content: Vec<u8> = ambient_sys::fs::read(path)
                 .await
                 .context(format!("Failed to read file at: {:}", self.0))?;
-            Ok(serde_json::from_slice(&content)?)
+            let de = &mut serde_json::de::Deserializer::from_slice(&content);
+            let res = serde_path_to_error::deserialize(de)?;
+            Ok(res)
         } else {
             Ok(
                 download(assets, self.to_download_raw_url(assets)?, |resp| async {
@@ -283,8 +291,10 @@ impl AbsAssetUrl {
         &self,
         assets: &AssetCache,
     ) -> anyhow::Result<T> {
-        let content = self.download_bytes(assets).await?;
-        Ok(toml::from_str(std::str::from_utf8(&content)?)?)
+        let content = self.download_string(assets).await?;
+        let de = toml::de::Deserializer::new(&content);
+        let res = serde_path_to_error::deserialize(de)?;
+        Ok(res)
     }
 }
 
@@ -309,28 +319,28 @@ impl From<AbsAssetUrl> for String {
 #[test]
 fn test_abs_asset_url() {
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/hello")
+        AbsAssetUrl::from_str("http://t.c/hello")
             .unwrap()
             .as_directory()
             .to_string(),
         "http://t.c/hello/"
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/hello/")
+        AbsAssetUrl::from_str("http://t.c/hello/")
             .unwrap()
             .as_directory()
             .to_string(),
         "http://t.c/hello/"
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/hello")
+        AbsAssetUrl::from_str("http://t.c/hello")
             .unwrap()
             .as_file()
             .to_string(),
         "http://t.c/hello"
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/hello/")
+        AbsAssetUrl::from_str("http://t.c/hello/")
             .unwrap()
             .as_file()
             .to_string(),
@@ -338,34 +348,30 @@ fn test_abs_asset_url() {
     );
 
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+        AbsAssetUrl::from_str("http://t.c/a/b/c.png")
             .unwrap()
             .last_dir_name(),
         Some("b")
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+        AbsAssetUrl::from_str("http://t.c/a/b/c.png")
             .unwrap()
             .last_dir_name(),
         Some("b")
     );
 
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/").unwrap().file_stem(),
+        AbsAssetUrl::from_str("http://t.c/a/").unwrap().file_stem(),
         None
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b")
-            .unwrap()
-            .file_stem()
-            .as_deref(),
+        AbsAssetUrl::from_str("http://t.c/a/b").unwrap().file_stem(),
         Some("b")
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+        AbsAssetUrl::from_str("http://t.c/a/b/c.png")
             .unwrap()
-            .file_stem()
-            .as_deref(),
+            .file_stem(),
         Some("c")
     );
 }
@@ -373,7 +379,7 @@ fn test_abs_asset_url() {
 #[test]
 fn test_abs_asset_url_join() {
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+        AbsAssetUrl::from_str("http://t.c/a/b/c.png")
             .unwrap()
             .join("d.png")
             .unwrap()
@@ -381,7 +387,7 @@ fn test_abs_asset_url_join() {
         "http://t.c/a/b/d.png"
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/a/b/c.png/")
+        AbsAssetUrl::from_str("http://t.c/a/b/c.png/")
             .unwrap()
             .join("d.png")
             .unwrap()
@@ -389,7 +395,7 @@ fn test_abs_asset_url_join() {
         "http://t.c/a/b/c.png/d.png"
     );
     assert_eq!(
-        AbsAssetUrl::parse(format!("{}:/a/b/c.png", ASSETS_PROTOCOL_SCHEME))
+        AbsAssetUrl::from_str(&format!("{}:/a/b/c.png", ASSETS_PROTOCOL_SCHEME))
             .unwrap()
             .join("d.png")
             .unwrap()
@@ -397,7 +403,7 @@ fn test_abs_asset_url_join() {
         format!("{}:/a/b/d.png", ASSETS_PROTOCOL_SCHEME)
     );
     assert_eq!(
-        AbsAssetUrl::parse(format!("{}:/a/b/c.png/", ASSETS_PROTOCOL_SCHEME))
+        AbsAssetUrl::from_str(&format!("{}:/a/b/c.png/", ASSETS_PROTOCOL_SCHEME))
             .unwrap()
             .join("d.png")
             .unwrap()
@@ -408,9 +414,9 @@ fn test_abs_asset_url_join() {
 
 #[test]
 fn test_abs_asset_url_to_download_url() {
-    let base_url = AbsAssetUrl::parse("http://t.c/content/").unwrap();
+    let base_url = AbsAssetUrl::from_str("http://t.c/content/").unwrap();
     assert_eq!(
-        AbsAssetUrl::parse(format!("{}:/a/b/c.png", ASSETS_PROTOCOL_SCHEME))
+        AbsAssetUrl::from_str(&format!("{}:/a/b/c.png", ASSETS_PROTOCOL_SCHEME))
             .unwrap()
             .to_download_url_with_base(&base_url)
             .unwrap()
@@ -418,7 +424,7 @@ fn test_abs_asset_url_to_download_url() {
         "http://t.c/content/a/b/c.png"
     );
     assert_eq!(
-        AbsAssetUrl::parse("http://t.c/content/a/b/c.png")
+        AbsAssetUrl::from_str("http://t.c/content/a/b/c.png")
             .unwrap()
             .to_download_url_with_base(&base_url)
             .unwrap()
@@ -436,16 +442,22 @@ pub enum AssetUrl {
     Absolute(AbsAssetUrl),
     Relative(RelativePathBuf),
 }
-impl AssetUrl {
-    pub fn parse(url_or_relative_path: impl AsRef<str>) -> Result<Self, url::ParseError> {
-        match Url::parse(url_or_relative_path.as_ref()) {
+
+impl FromStr for AssetUrl {
+    type Err = url::ParseError;
+
+    fn from_str(url_or_relative_path: &str) -> Result<Self, Self::Err> {
+        match Url::parse(url_or_relative_path) {
             Ok(url) => Ok(Self::Absolute(AbsAssetUrl(url))),
             Err(url::ParseError::RelativeUrlWithoutBase) => {
-                Ok(Self::Relative(url_or_relative_path.as_ref().into()))
+                Ok(Self::Relative(url_or_relative_path.into()))
             }
             Err(err) => Err(err),
         }
     }
+}
+
+impl AssetUrl {
     /// This is always lowercase
     pub fn extension(&self) -> Option<String> {
         match self {
@@ -565,7 +577,7 @@ impl<'de> Deserialize<'de> for AssetUrl {
             where
                 E: serde::de::Error,
             {
-                AssetUrl::parse(v)
+                AssetUrl::from_str(v)
                     .map_err(|err| E::custom(format!("Bad asset url format: {err:?}")))
             }
         }
@@ -584,10 +596,15 @@ impl<'de> Deserialize<'de> for AssetUrl {
 #[serde(transparent)]
 pub struct TypedAssetUrl<T: GetAssetType>(pub AssetUrl, PhantomData<T>);
 
-impl<T: GetAssetType> TypedAssetUrl<T> {
-    pub fn parse(url_or_relative_path: impl AsRef<str>) -> Result<Self, url::ParseError> {
-        Ok(Self(AssetUrl::parse(url_or_relative_path)?, PhantomData))
+impl<T: GetAssetType> FromStr for TypedAssetUrl<T> {
+    type Err = url::ParseError;
+
+    fn from_str(url_or_relative_path: &str) -> Result<Self, Self::Err> {
+        Ok(Self(AssetUrl::from_str(url_or_relative_path)?, PhantomData))
     }
+}
+
+impl<T: GetAssetType> TypedAssetUrl<T> {
     pub fn new(url: impl Into<AssetUrl>) -> Self {
         Self(url.into(), PhantomData)
     }
@@ -807,7 +824,7 @@ impl GetAssetType for ColliderAssetType {
 
 #[test]
 fn test_join() {
-    let obj = TypedAssetUrl::<PrefabAssetType>::parse("https://playdims.com/api/v1/assetdb/crates/RxH7k2ox5Ug6DNcqJhta/1.7.0/quixel_groundcover_wcwmchzja_2k_3dplant_ms_wcwmchzja_json0/objects/main.json").unwrap();
+    let obj = TypedAssetUrl::<PrefabAssetType>::from_str("https://playdims.com/api/v1/assetdb/crates/RxH7k2ox5Ug6DNcqJhta/1.7.0/quixel_groundcover_wcwmchzja_2k_3dplant_ms_wcwmchzja_json0/objects/main.json").unwrap();
     let crat = obj.model_crate().unwrap();
     assert_eq!(
         crat.to_string(),
@@ -816,7 +833,7 @@ fn test_join() {
     let model = crat.model();
     assert_eq!(model.to_string(), "https://playdims.com/api/v1/assetdb/crates/RxH7k2ox5Ug6DNcqJhta/1.7.0/quixel_groundcover_wcwmchzja_2k_3dplant_ms_wcwmchzja_json0/models/main.json");
 
-    let anim = TypedAssetUrl::<AnimationAssetType>::parse(
+    let anim = TypedAssetUrl::<AnimationAssetType>::from_str(
         "assets/Capoeira.fbx/animations/mixamo.com.anim",
     )
     .unwrap();

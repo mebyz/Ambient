@@ -1,6 +1,12 @@
-use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    path::Path,
+    str::FromStr,
+    sync::Arc,
+};
 
-use ambient_core::{abs_time, app_start_time, asset_cache, dtime, name, no_sync, project_name};
+use ambient_core::{asset_cache, name, no_sync, project_name, FIXED_SERVER_TICK_TIME};
 use ambient_ecs::{
     dont_store, world_events, ComponentDesc, ComponentRegistry, Entity, Networked, SystemGroup,
     World, WorldEventsSystem, WorldStreamCompEvent,
@@ -16,7 +22,7 @@ use ambient_std::{
     asset_cache::{AssetCache, AsyncAssetKeyExt, SyncAssetKeyExt},
     asset_url::{AbsAssetUrl, ServerBaseUrlKey},
 };
-use ambient_sys::{task::RuntimeHandle, time::SystemTime};
+use ambient_sys::task::RuntimeHandle;
 use anyhow::Context;
 use axum::{
     http::{Method, StatusCode},
@@ -27,22 +33,21 @@ use axum::{
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
 use crate::{
-    cli::{Cli, Commands},
+    cli::{Cli, Commands, HostCli},
     shared,
 };
 
 pub mod wasm;
 
-pub fn start(
-    runtime: &tokio::runtime::Runtime,
+pub async fn start(
+    runtime: &tokio::runtime::Handle,
     assets: AssetCache,
     cli: Cli,
     project_path: AbsAssetUrl,
     manifest: &ambient_project::Manifest,
     metadata: &ambient_build::Metadata,
     crypto: Crypto,
-) -> u16 {
-    log::info!("Creating server");
+) -> SocketAddr {
     let host_cli = cli.host().unwrap();
     let quic_interface_port = host_cli.quic_interface_port;
     let proxy_settings = (!host_cli.no_proxy).then(|| {
@@ -54,51 +59,68 @@ pub fn start(
                 .unwrap_or("http://proxy.ambient.run/proxy".to_string()),
             project_path: project_path.clone(),
             pre_cache_assets: host_cli.proxy_pre_cache_assets,
-            project_id: manifest.project.id.to_string(),
+            project_id: manifest.ember.id.to_string(),
         }
     });
-    let server = runtime.block_on(async move {
-        if let Some(port) = quic_interface_port {
-            GameServer::new_with_port(port, false, proxy_settings, &crypto)
-                .await
-                .context("failed to create game server with port")
-                .unwrap()
-        } else {
-            GameServer::new_with_port_in_range(
-                QUIC_INTERFACE_PORT..(QUIC_INTERFACE_PORT + 10),
-                false,
-                proxy_settings,
-                &crypto,
-            )
-            .await
-            .context("failed to create game server with port in range")
-            .unwrap()
-        }
-    });
-    let port = server.port;
 
-    let public_host = cli
-        .host()
-        .and_then(|h| h.public_host.clone())
-        .and_then(|_| local_ip_address::local_ip().ok())
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "localhost".to_string());
+    let server = if let Some(port) = quic_interface_port {
+        GameServer::new_with_port(
+            SocketAddr::new(host_cli.bind_address, port),
+            false,
+            proxy_settings,
+            &crypto,
+        )
+        .await
+        .context("failed to create game server with port")
+        .unwrap()
+    } else {
+        GameServer::new_with_port_in_range(
+            host_cli.bind_address,
+            QUIC_INTERFACE_PORT..(QUIC_INTERFACE_PORT + 10),
+            false,
+            proxy_settings,
+            &crypto,
+        )
+        .await
+        .context("failed to create game server with port in range")
+        .unwrap()
+    };
 
-    // TODO: use bound socket address
-    log::info!("Created server, running at {public_host}:{port}");
+    let addr = server.local_addr();
+
+    tracing::info!("Created server, running at {addr}");
     let http_interface_port = cli
         .host()
         .unwrap()
         .http_interface_port
         .unwrap_or(HTTP_INTERFACE_PORT);
 
+    let public_host = match (cli.host().as_ref(), addr.ip()) {
+        // use public_host if specified in cli
+        (
+            Some(&HostCli {
+                public_host: Some(host),
+                ..
+            }),
+            _,
+        ) => host.clone(),
+
+        // if the bind address is not specified (0.0.0.0, ::0) then use localhost
+        (_, IpAddr::V4(Ipv4Addr::UNSPECIFIED)) => IpAddr::V4(Ipv4Addr::LOCALHOST).to_string(),
+        (_, IpAddr::V6(Ipv6Addr::UNSPECIFIED)) => IpAddr::V6(Ipv6Addr::LOCALHOST).to_string(),
+
+        // otherwise use the address that the server is binding to
+        (_, addr) => addr.to_string(),
+    };
+
     // here the key is inserted into the asset cache
     if let Ok(Some(project_path_fs)) = project_path.to_file_path() {
         let key = format!("http://{public_host}:{http_interface_port}/content/");
-        ServerBaseUrlKey.insert(&assets, AbsAssetUrl::parse(key).unwrap());
-        start_http_interface(runtime, &project_path_fs, http_interface_port);
+        ServerBaseUrlKey.insert(&assets, AbsAssetUrl::from_str(&key).unwrap());
+        start_http_interface(runtime, Some(&project_path_fs), http_interface_port);
     } else {
         ServerBaseUrlKey.insert(&assets, project_path.push("build/").unwrap());
+        start_http_interface(runtime, None, http_interface_port);
     }
 
     ComponentRegistry::get_mut()
@@ -119,7 +141,7 @@ pub fn start(
 
         // Keep track of the project name
         let name = manifest
-            .project
+            .ember
             .name
             .clone()
             .unwrap_or_else(|| "Ambient".into());
@@ -174,7 +196,8 @@ pub fn start(
             )
             .await;
     });
-    port
+
+    addr
 }
 
 fn systems(_world: &mut World) -> SystemGroup {
@@ -187,6 +210,7 @@ fn systems(_world: &mut World) -> SystemGroup {
             Box::new(ambient_prefab::systems()),
             // Happens after the physics step
             ambient_physics::fetch_simulation_system(),
+            Box::new(ambient_animation::animation_systems()),
             Box::new(ambient_physics::physx::sync_ecs_physics()),
             Box::new(ambient_core::transform::TransformSystem::new()),
             ambient_core::remove_at_time_system(),
@@ -231,12 +255,7 @@ fn create_resources(assets: AssetCache) -> Entity {
     server_resources.merge(ambient_core::async_ecs::async_ecs_resources());
     server_resources.set(ambient_core::runtime(), RuntimeHandle::current());
 
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    server_resources.set(abs_time(), now);
-    server_resources.set(app_start_time(), now);
-    server_resources.set(dtime(), 1. / 60.);
+    server_resources.merge(ambient_core::time_resources_start(FIXED_SERVER_TICK_TIME));
 
     let mut bistream_handlers = HashMap::new();
     ambient_network::server::register_rpc_bi_stream_handler(
@@ -263,22 +282,25 @@ fn create_resources(assets: AssetCache) -> Entity {
 pub const HTTP_INTERFACE_PORT: u16 = 8999;
 pub const QUIC_INTERFACE_PORT: u16 = 9000;
 fn start_http_interface(
-    runtime: &tokio::runtime::Runtime,
-    project_path: &Path,
+    runtime: &tokio::runtime::Handle,
+    project_path: Option<&Path>,
     http_interface_port: u16,
 ) {
-    let router = Router::new()
-        .route("/ping", get(|| async move { "ok" }))
-        .nest_service(
+    let mut router = Router::new().route("/ping", get(|| async move { "ok" }));
+
+    if let Some(project_path) = project_path {
+        router = router.nest_service(
             "/content",
             get_service(ServeDir::new(project_path.join("build"))).handle_error(handle_error),
-        )
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods(vec![Method::GET])
-                .allow_headers(tower_http::cors::Any),
         );
+    };
+
+    router = router.layer(
+        CorsLayer::new()
+            .allow_origin(tower_http::cors::Any)
+            .allow_methods(vec![Method::GET])
+            .allow_headers(tower_http::cors::Any),
+    );
 
     let serve = |addr| async move {
         axum::Server::try_bind(&addr)?

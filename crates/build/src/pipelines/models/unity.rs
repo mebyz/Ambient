@@ -11,7 +11,7 @@ use ambient_model::{pbr_renderer_primitives_from_url, Model, PbrRenderPrimitiveF
 use ambient_model_import::{
     dotdot_path,
     model_crate::{cap_texture_size, ModelCrate},
-    ModelImportPipeline, ModelImportTransform, ModelTransform, RelativePathBufExt,
+    ModelImportPipeline, ModelImportTransform, RelativePathBufExt,
 };
 use ambient_renderer::{
     lod::{gpu_lod, lod_cutoffs, LodCutoffs},
@@ -35,8 +35,10 @@ use yaml_rust::Yaml;
 
 use super::{super::context::PipelineCtx, create_texture_resolver, ModelsPipeline};
 use crate::pipelines::{
-    download_image, out_asset::asset_id_from_url, OutAsset, OutAssetContent, OutAssetPreview,
+    download_image, models, out_asset::asset_id_from_url, OutAsset, OutAssetContent,
+    OutAssetPreview,
 };
+use ambient_pipeline_types::models::ModelTransform;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnityConfig {
@@ -121,9 +123,8 @@ pub async fn pipeline(
                         &out_model_url.into(),
                     )
                     .await?;
-                    config
-                        .apply(&ctx, &mut asset_crate, &out_model_path)
-                        .await?;
+
+                    models::apply(&config, &ctx, &mut asset_crate, &out_model_path).await?;
 
                     let model_crate_url =
                         ctx.write_model_crate(&asset_crate, &out_model_path).await;
@@ -187,7 +188,7 @@ pub async fn pipeline(
                         *mat = mat.relative_path_from(&out_root.push("materials").unwrap());
                     }
 
-                    config.apply(&ctx, &mut asset_crate, &out_path).await?;
+                    models::apply(&config, &ctx, &mut asset_crate, &out_path).await?;
 
                     let model_crate_url = ctx.write_model_crate(&asset_crate, &out_path).await;
                     res.push(OutAsset {

@@ -229,6 +229,14 @@ impl ServerState {
     pub fn is_pending_connection(&self) -> bool {
         matches!(self, Self::PendingConnection)
     }
+
+    /// Returns `true` if the server state is [`Disconnected`].
+    ///
+    /// [`Disconnected`]: ServerState::Disconnected
+    #[must_use]
+    pub fn is_disconnected(&self) -> bool {
+        matches!(self, Self::Disconnected)
+    }
 }
 
 impl ConnectedClient {
@@ -341,7 +349,7 @@ impl ConnectedClient {
 
 /// Send the server stats over the network
 pub async fn handle_stats<S>(
-    stream: stream::SendStream<FpsSample, S>,
+    stream: stream::FramedSendStream<FpsSample, S>,
     stats: impl Stream<Item = FpsSample>,
 ) where
     S: Unpin + AsyncWrite,
@@ -351,13 +359,16 @@ pub async fn handle_stats<S>(
 
 /// Sends the world diffs over the network
 pub async fn handle_diffs<S>(
-    mut stream: stream::SendStream<WorldDiff, S>,
+    mut stream: stream::FramedSendStream<WorldDiff, S>,
     mut diffs_rx: impl Unpin + Stream<Item = Bytes>,
 ) where
     S: Unpin + AsyncWrite,
 {
     while let Some(msg) = diffs_rx.next().await {
         let span = tracing::debug_span!("send_world_diff", ?msg);
-        stream.send_bytes(msg).instrument(span).await.unwrap();
+        if let Err(err) = stream.send_bytes(msg).instrument(span).await {
+            tracing::error!(?err, "Failed to send world diff.");
+            break;
+        }
     }
 }

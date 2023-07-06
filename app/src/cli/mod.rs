@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
@@ -38,16 +38,24 @@ pub enum Commands {
         project_args: ProjectCli,
     },
     /// Deploys the project
-    #[cfg(feature = "deploy")]
     Deploy {
         #[command(flatten)]
         project_args: ProjectCli,
-        /// API server endpoint, defaults to https://api.ambient.run
-        #[arg(long)]
-        api_server: Option<String>,
+        /// API server endpoint
+        #[arg(long, default_value = "https://api.ambient.run")]
+        api_server: String,
         /// Authentication token
-        #[arg(short, long)]
-        token: Option<String>,
+        #[arg(short, long, required = true)]
+        token: String,
+        /// Don't use differential upload and upload all assets
+        #[arg(long)]
+        force_upload: bool,
+        /// Ensure the project is running after deploying
+        #[arg(long)]
+        ensure_running: bool,
+        /// Context to run the project in
+        #[arg(long, requires("ensure_running"), default_value = "")]
+        context: String,
     },
     /// Builds and runs the project in server-only mode
     Serve {
@@ -70,6 +78,19 @@ pub enum Commands {
         /// The server to connect to; defaults to localhost
         host: Option<String>,
     },
+    /// Asset manipulation and migration
+    Assets {
+        #[command(subcommand)]
+        command: AssetCommand,
+        path: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug)]
+pub enum AssetCommand {
+    /// Migrate json pipelines to toml
+    #[command(name = "migrate-pipelines-toml")]
+    MigratePipelinesToml,
 }
 
 #[derive(Subcommand, Clone, Copy, Debug)]
@@ -113,6 +134,10 @@ pub struct RunCli {
 
 #[derive(Args, Clone, Debug)]
 pub struct ProjectCli {
+    /// Dummy flag to catch Rust users using muscle memory and warn them
+    #[arg(long, short, hide = true)]
+    pub project: bool,
+
     /// The path or URL of the project to run; if not specified, this will default to the current directory
     pub path: Option<String>,
 
@@ -129,6 +154,8 @@ pub struct ProjectCli {
 }
 #[derive(Args, Clone, Debug)]
 pub struct HostCli {
+    #[arg(long, default_value = "0.0.0.0")]
+    pub bind_address: IpAddr,
     /// Provide a public address or IP to the instance, which will allow users to connect to this instance over the internet
     ///
     /// Defaults to localhost
@@ -170,11 +197,11 @@ impl Cli {
             Commands::New { .. } => None,
             Commands::Run { run_args, .. } => Some(run_args),
             Commands::Build { .. } => None,
-            #[cfg(feature = "deploy")]
             Commands::Deploy { .. } => None,
             Commands::Serve { .. } => None,
             Commands::View { .. } => None,
             Commands::Join { run_args, .. } => Some(run_args),
+            Commands::Assets { .. } => None,
         }
     }
     /// Extract project-relevant state only
@@ -183,11 +210,11 @@ impl Cli {
             Commands::New { project_args, .. } => Some(project_args),
             Commands::Run { project_args, .. } => Some(project_args),
             Commands::Build { project_args, .. } => Some(project_args),
-            #[cfg(feature = "deploy")]
             Commands::Deploy { project_args, .. } => Some(project_args),
             Commands::Serve { project_args, .. } => Some(project_args),
             Commands::View { project_args, .. } => Some(project_args),
             Commands::Join { .. } => None,
+            Commands::Assets { .. } => None,
         }
     }
     /// Extract host-relevant state only
@@ -196,11 +223,11 @@ impl Cli {
             Commands::New { .. } => None,
             Commands::Run { host_args, .. } => Some(host_args),
             Commands::Build { .. } => None,
-            #[cfg(feature = "deploy")]
             Commands::Deploy { .. } => None,
             Commands::Serve { host_args, .. } => Some(host_args),
             Commands::View { .. } => None,
             Commands::Join { .. } => None,
+            Commands::Assets { .. } => None,
         }
     }
 }

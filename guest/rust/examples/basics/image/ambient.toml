@@ -1,4 +1,7 @@
-[project]
-id = "image_quad"
+[ember]
+id = "ambient_example_image_quad"
 name = "Image"
 version = "0.0.1"
+repository = "https://github.com/AmbientRun/Ambient/tree/main/guest/rust/examples/basics/image"
+type = "Game"
+categories = ["Example"]

@@ -115,7 +115,7 @@ impl FromStr for FontFamily {
             "FontAwesome" => Ok(Self::FontAwesome { solid: false }),
             "FontAwesomeSolid" => Ok(Self::FontAwesome { solid: true }),
             "Code" => Ok(Self::SourceSansPro),
-            url => Ok(Self::Custom(AbsAssetUrl::parse(url)?)),
+            url => Ok(Self::Custom(AbsAssetUrl::from_str(url)?)),
         }
     }
 }
@@ -498,7 +498,7 @@ pub struct GlyphVertex {
 }
 
 fn mesh_from_glyph_vertices(vertices: Vec<GlyphVertex>) -> Mesh {
-    assert!(vertices.len() > 0);
+    assert!(!vertices.is_empty());
     let mut positions = Vec::new();
     let mut texcoords = Vec::new();
     let mut normals = Vec::new();

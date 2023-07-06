@@ -1,13 +1,5 @@
 use std::{marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
-use ambient_sys::task::wasm_nonsend;
-use anyhow::{anyhow, Context};
-use async_trait::async_trait;
-use futures::Future;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use thiserror::Error;
-use tokio::sync::Semaphore;
-
 use crate::{
     asset_cache::{
         AssetCache, AssetKeepalive, AsyncAssetKey, AsyncAssetKeyExt, SyncAssetKey, SyncAssetKeyExt,
@@ -15,6 +7,14 @@ use crate::{
     asset_url::AbsAssetUrl,
     mesh::Mesh,
 };
+use ambient_sys::task::wasm_nonsend;
+use anyhow::{anyhow, Context};
+use async_trait::async_trait;
+use futures::Future;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::str::FromStr;
+use thiserror::Error;
+use tokio::sync::Semaphore;
 
 pub type AssetResult<T> = Result<T, AssetError>;
 
@@ -97,6 +97,10 @@ pub(crate) async fn download<T: 'static + Send, F: Future<Output = anyhow::Resul
             log::info!("download [download] {}", url_short);
             let resp = client
                 .get(url.clone())
+                .header(
+                    "User-Agent",
+                    format!("Ambient/{}", env!("CARGO_PKG_VERSION")),
+                )
                 .send()
                 .await
                 .with_context(|| format!("Failed to download {url_str}"))?;
@@ -139,7 +143,7 @@ impl BytesFromUrl {
     }
     pub fn parse_url(url: impl AsRef<str>, cache_on_disk: bool) -> anyhow::Result<Self> {
         Ok(Self {
-            url: AbsAssetUrl::parse(url)?,
+            url: AbsAssetUrl::from_str(url.as_ref())?,
             cache_on_disk,
         })
     }
@@ -199,7 +203,7 @@ pub struct BytesFromUrlCachedPath {
 impl BytesFromUrlCachedPath {
     pub fn parse_url(url: impl AsRef<str>) -> anyhow::Result<Self> {
         Ok(Self {
-            url: AbsAssetUrl::parse(url)?,
+            url: AbsAssetUrl::from_str(url.as_ref())?,
         })
     }
 }
@@ -318,7 +322,7 @@ impl<T> JsonFromUrl<T> {
     }
     pub fn parse_url(url: impl AsRef<str>, cache_on_disk: bool) -> anyhow::Result<Self> {
         Ok(Self {
-            url: AbsAssetUrl::parse(url)?,
+            url: AbsAssetUrl::from_str(url.as_ref())?,
             cache_on_disk,
             _type: PhantomData,
         })
@@ -373,7 +377,7 @@ impl<T> BincodeFromUrl<T> {
     }
     pub fn parse_url(url: impl AsRef<str>, cache_on_disk: bool) -> anyhow::Result<Self> {
         Ok(Self {
-            url: AbsAssetUrl::parse(url)?,
+            url: AbsAssetUrl::from_str(url.as_ref())?,
             cache_on_disk,
             type_: PhantomData,
         })

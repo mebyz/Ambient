@@ -1,4 +1,14 @@
-use ambient_api::{prelude::*, ui::ImageFromUrl};
+use ambient_api::{
+    components::core::{
+        layout::space_between_items,
+        rect::{
+            background_color, border_color, border_radius, border_thickness,
+            size_from_background_image,
+        },
+    },
+    prelude::*,
+    ui::ImageFromUrl,
+};
 
 #[element_component]
 fn App(_hooks: &mut Hooks) -> Element {
@@ -10,18 +20,18 @@ fn App(_hooks: &mut Hooks) -> Element {
         .with_default(size_from_background_image()),
         FlowRow::el([
             ImageFromUrl {
-                url: "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bucephala-albeola-010.jpg"
+                url: "https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/Bucephala-albeola-010.jpg"
                     .to_string(),
             }
             .el(),
             ImageFromUrl {
-                url: "https://upload.wikimedia.org/wikipedia/commons/9/9d/Alpha_transparency_image.png"
+                url: "https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/Alpha_transparency_image.png"
                     .to_string(),
             }
             .el()
             .with(background_color(), vec4(1., 0., 1., 1.)),
             ImageFromUrl {
-                url: "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bucephala-albeola-010.jpg"
+                url: "https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/Bucephala-albeola-010.jpg"
                     .to_string(),
             }
             .el()

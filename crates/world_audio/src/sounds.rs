@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ambient_audio::{
-    hrtf::HrtfLib, track::TrackDecodeStream,
-    Attenuation, AudioEmitter, AudioListener, AudioMixer, Sound, SoundId, Source, Spatial
+    hrtf::HrtfLib,
+    track::{Track, TrackDecodeStream},
+    Attenuation, AudioEmitter, AudioListener, AudioMixer, Sound, SoundId, Source, Spatial,
 };
 use ambient_ecs::{components, query, EntityId, Resource, World};
 use ambient_element::ElementComponentExt;
@@ -16,7 +17,6 @@ use derive_more::{Deref, DerefMut, From, Into};
 use glam::{vec2, vec4};
 use itertools::Itertools;
 use parking_lot::Mutex;
-use parking_lot::RawMutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -31,27 +31,38 @@ components!("audio", {
     audio_mixer: AudioMixer,
 });
 
+pub enum AudioFx {
+    Looping,
+    Amplitude(f32),
+    Panning(f32),
+    Lpf(f32, f32),
+    Hpf(f32, f32),
+}
+
+#[allow(clippy::large_enum_variant)]
 pub enum AudioMessage {
-    Track(
-        Arc<ambient_audio::track::Track>,
-        bool,
-        f32,
-        AbsAssetUrl,
-        u32,
-    ),
-    Spatial(
-        Spatial<TrackDecodeStream, Arc<parking_lot::lock_api::Mutex<RawMutex, AudioListener>>, Arc<parking_lot::lock_api::Mutex<RawMutex, AudioEmitter>>>
-    ),
-    UpdateVolume(AbsAssetUrl, f32),
-    Stop(AbsAssetUrl),
-    StopById(u32),
+    Track {
+        track: Arc<Track>,
+        url: AbsAssetUrl,
+        fx: Vec<AudioFx>,
+        uid: String,
+    },
+    Spatial(Spatial<TrackDecodeStream, Arc<Mutex<AudioListener>>, Arc<Mutex<AudioEmitter>>>),
+    // sound id and amplitude
+    UpdateVolume(String, f32),
+    UpdatePanning(String, f32),
+    StopById(String),
 }
 
 pub struct SoundInfo {
     pub url: AbsAssetUrl,
-    pub looping: bool,
-    pub gain: Arc<Mutex<f32>>,
     pub id: SoundId,
+    pub control_info: Vec<AudioControl>,
+}
+
+pub enum AudioControl {
+    Amplitude(Arc<Mutex<f32>>),
+    Panning(Arc<Mutex<f32>>),
 }
 
 /// TODO: hook this into the Attenuation inside ambient_audio

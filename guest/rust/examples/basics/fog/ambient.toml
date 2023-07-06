@@ -1,4 +1,7 @@
-[project]
-id = "fog"
+[ember]
+id = "ambient_example_fog"
 name = "Fog"
 version = "0.0.1"
+repository = "https://github.com/AmbientRun/Ambient/tree/main/guest/rust/examples/basics/fog"
+type = "Game"
+categories = ["Example"]

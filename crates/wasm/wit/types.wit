@@ -1,4 +1,4 @@
-default interface types {
+interface types {
     record entity-id {
         id0: u64,
         id1: u64,
@@ -38,6 +38,24 @@ default interface types {
         y: u32,
         z: u32,
         w: u32,
+    }
+
+    record ivec2 {
+        x: s32,
+        y: s32,
+    }
+
+    record ivec3 {
+        x: s32,
+        y: s32,
+        z: s32,
+    }
+
+    record ivec4 {
+        x: s32,
+        y: s32,
+        z: s32,
+        w: s32,
     }
 
     record quat {

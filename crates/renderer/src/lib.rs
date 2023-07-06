@@ -1,4 +1,4 @@
-use std::{f32::consts::PI, fmt::Debug, sync::Arc};
+use std::{f32::consts::PI, fmt::Debug, str::FromStr, sync::Arc};
 
 use ambient_core::{
     asset_cache,
@@ -104,7 +104,7 @@ pub fn systems() -> SystemGroup {
             )),
             query(pbr_material_from_url().changed()).to_system(|q, world, qs, _| {
                 for (id, url) in q.collect_cloned(world, qs) {
-                    let url = match AbsAssetUrl::parse(url) {
+                    let url = match AbsAssetUrl::from_str(&url) {
                         Ok(value) => value,
                         Err(err) => {
                             log::warn!("Failed to parse pbr_material_from_url url: {:?}", err);
@@ -506,14 +506,22 @@ pub(crate) fn set_scissors_safe(
     render_pass: &mut wgpu::RenderPass,
     render_target_size: wgpu::Extent3d,
     scissors: Option<UVec4>,
-) {
+) -> bool {
     if let Some(scissors) = scissors {
         let left = scissors.x.clamp(0, render_target_size.width);
         let top = scissors.y.clamp(0, render_target_size.height);
         let right = (left + scissors.z).clamp(0, render_target_size.width);
         let bottom = (top + scissors.w).clamp(0, render_target_size.height);
-        render_pass.set_scissor_rect(left, top, right - left, bottom - top);
+        let width = right - left;
+        let height = bottom - top;
+        if width > 0 && height > 0 {
+            render_pass.set_scissor_rect(left, top, width, height);
+            true
+        } else {
+            false
+        }
     } else {
         render_pass.set_scissor_rect(0, 0, render_target_size.width, render_target_size.height);
+        true
     }
 }

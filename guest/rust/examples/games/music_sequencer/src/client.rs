@@ -1,7 +1,17 @@
 use std::time::Duration;
 
-use ambient_api::global::time;
-use ambient_api::{entity::synchronized_resources, messages::Frame, prelude::*};
+use ambient_api::{
+    components::core::{
+        app::name,
+        layout::{
+            fit_horizontal_children, fit_vertical_children, height, space_between_items, width,
+        },
+    },
+    entity::synchronized_resources,
+    global::game_time,
+    messages::Frame,
+    prelude::*,
+};
 
 mod common;
 use components::bpm;
@@ -9,7 +19,7 @@ use components::bpm;
 #[main]
 pub fn main() {
     let mut cursor = 0;
-    let mut last_note_time = time();
+    let mut last_note_time = game_time();
     let mut last_bpm = 0;
     let mut tree = Element::new().spawn_tree();
     Frame::subscribe(move |_| {
@@ -19,7 +29,7 @@ pub fn main() {
             last_bpm = bpm;
         }
 
-        let now = time();
+        let now = game_time();
         if now - last_note_time > Duration::from_secs_f32(seconds_per_note(bpm)) {
             last_note_time = now;
             cursor = (cursor + 1) % common::NOTE_COUNT;
@@ -69,13 +79,15 @@ fn Track(
 
     let (sound, _) = hooks.use_state_with(|_| {
         let url = entity::get_component(track_id, components::track_audio_url()).unwrap();
-        audio::load(asset::url(url).unwrap())
+        asset::url(url).unwrap()
     });
+
+    let (audio_player, _) = hooks.use_state(audio::AudioPlayer::new());
 
     let (last_cursor, set_last_cursor) = hooks.use_state(0);
     if cursor != last_cursor {
         if track_selection[cursor] != 0 {
-            sound.play();
+            audio_player.play(sound);
         }
         set_last_cursor(cursor);
     }

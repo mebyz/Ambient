@@ -1,4 +1,7 @@
-[project]
-id = "transparency"
+[ember]
+id = "ambient_example_transparency"
 name = "Transparency"
 version = "0.0.1"
+repository = "https://github.com/AmbientRun/Ambient/tree/main/guest/rust/examples/basics/transparency"
+type = "Game"
+categories = ["Example"]

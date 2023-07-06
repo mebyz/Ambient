@@ -1,4 +1,7 @@
 {
+    "check": {
+        "cmd": "cargo check"
+    },
     "client": {
         "cmd": "cargo run -p ambient"
     },
@@ -6,7 +9,28 @@
         "cmd": "cargo run --features profile --release -- run ./guest/rust/examples/basics/third_person_camera"
     },
     "third-person-camera": {
-        "cmd": "cargo run --features tracing -- run ./guest/rust/examples/basics/third_person_camera --no-proxy"
+        "cmd": "cargo run --features tracing -- run ./guest/rust/examples/basics/third_person_camera --debugger"
+    },
+    "join": {
+        "cmd": [
+            "cargo",
+            "run",
+            "--features",
+            "tracing",
+            "--",
+            "join",
+            "localhost:9000",
+            "--debugger"
+        ]
+    },
+    "asset-loading": {
+        "cmd": "cargo run --features tracing -- run ./guest/rust/examples/basics/asset_loading --clean-build --debugger"
+    },
+    "serve-primitives": {
+        "cmd": "cargo run --features tracing -- serve ./guest/rust/examples/basics/primitives/",
+        "env": {
+            "RUST_LOG": "ambient_network=debug,info"
+        }
     },
     "minigolf": {
         "cmd": "cargo run -- run ./guest/rust/examples/games/minigolf"
@@ -29,8 +53,7 @@
                 "justMyCode": true,
                 "args": [
                     "run",
-                    "./guest/rust/examples/basics/third_person_camera",
-                    "--no-proxy"
+                    "./guest/rust/examples/basics/third_person_camera"
                 ]
             }
         }
@@ -57,8 +80,8 @@
             }
         }
     },
-    "check-tests": {
-        "cmd": "cargo check --workspace --tests --examples"
+    "check-all": {
+        "cmd": "cargo check --workspace --all-targets"
     },
     "test": {
         "cmd": "cargo nextest run --workspace"
@@ -81,22 +104,53 @@
     "launch-chrome": {
         "cmd": "./scripts/launch_chrome.sh"
     },
-    "example-with-space": {
-        "cmd": [
-            "cargo",
-            "run",
-            "--features",
-            "tracing",
-            "--",
-            "run",
-            "--clean-build",
-            "./guest/rust/examples/breaking basics/with space"
-        ],
-        "env": {
-            "RUST_LOG": "ambient_build=debug,ambient_std=trace,info"
+    "build-web": {
+        "cmd": "wasm-pack build client --dev",
+        "cwd": "web",
+        "components": {
+            "qf": {
+                "compiler": "cargo"
+            }
         }
     },
-    "example-assets": {
+    "run": {
+        "cmd": "npm run dev",
+        "cwd": "web/www",
+        "env": {
+            "RUST_LOG": "info"
+        }
+    },
+    "migrate-pipelines-toml": {
+        "cmd": [
+            "cargo",
+            "run",
+            "--",
+            "assets",
+            "guest/rust/examples/basics/asset_loading",
+            "migrate-pipelines-toml"
+        ],
+        "env": {
+            "RUST_LOG": "ambient_build=info"
+        }
+    },
+    "serve": {
+        "cmd": "npm run dev",
+        "cwd": "web/www",
+        "components": {
+            "qf": false
+        },
+        "env": {
+            "RUST_LOG": "info"
+        }
+    },
+    "serve-bundle": {
+        "depends_on": [
+            "build-web",
+            "serve-primitives",
+            "serve"
+        ]
+    },
+    "instancing": {
         "cmd": [
             "cargo",
             "run",
@@ -104,11 +158,8 @@
             "tracing",
             "--",
             "run",
-            "--clean-build",
-            "./guest/rust/examples/basics/asset_loading/"
-        ],
-        "env": {
-            "RUST_LOG": "ambient_build=debug,ambient_std=trace,info"
-        }
+            "./guest/rust/examples/basics/instancing",
+            "--clean-build"
+        ]
     }
 }

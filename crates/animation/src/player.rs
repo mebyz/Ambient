@@ -1,10 +1,11 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    str::FromStr,
     sync::Arc,
     time::Duration,
 };
 
-use ambient_core::{abs_time, asset_cache, async_ecs::async_run, runtime};
+use ambient_core::{asset_cache, async_ecs::async_run, epoch_time, runtime};
 use ambient_ecs::{
     children, components,
     generated::components::core::animation::{
@@ -22,6 +23,7 @@ use ambient_std::{
 };
 use anyhow::Context;
 use glam::{Quat, Vec3};
+use itertools::Itertools;
 
 use crate::{
     AnimationClip, AnimationClipRetargetedFromModel, AnimationOutput, AnimationRetargeting,
@@ -30,14 +32,26 @@ use crate::{
 
 components!("animation", {
     @[Debuggable]
-    animation_output: HashMap<AnimationOutputKey, AnimationOutput>,
+    animation_output: AnimationOutputs,
     @[Debuggable]
     mask: HashMap<String, f32>,
     cached_base_pose: HashMap<AnimationOutputKey, AnimationOutput>,
     play_clip: Arc<AnimationClip>,
 });
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone)]
+pub struct AnimationOutputs(HashMap<AnimationOutputKey, AnimationOutput>);
+impl std::fmt::Debug for AnimationOutputs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+        for (key, value) in self.0.iter().sorted_by_key(|x| x.0) {
+            map.entry(key, value);
+        }
+        map.finish()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnimationOutputKey {
     target: AnimationTarget,
     component: u32,
@@ -64,7 +78,7 @@ fn sample_animation_node_inner(
     time: Duration,
     errors: &mut Vec<String>,
 ) -> anyhow::Result<HashMap<AnimationOutputKey, AnimationOutput>> {
-    if let Ok(_) = world.get_ref(node, play_clip_from_url()) {
+    if world.get_ref(node, play_clip_from_url()).is_ok() {
         let clip = match world.get_ref(node, play_clip()) {
             Ok(clip) => clip,
             Err(_) => return Ok(Default::default()),
@@ -80,7 +94,7 @@ fn sample_animation_node_inner(
             };
             let speed = world.get(node, speed()).unwrap_or(1.);
             if world.get(node, looping()).unwrap_or(false) {
-                time = time % clip.duration() as f64;
+                time %= clip.duration() as f64;
             }
             time * speed as f64
         };
@@ -98,8 +112,8 @@ fn sample_animation_node_inner(
             })
             .collect();
         if let Ok(base_pose) = world.get_ref(node, cached_base_pose()) {
-            for (key, value) in base_pose.into_iter() {
-                if !output.contains_key(&key) {
+            for (key, value) in base_pose.iter() {
+                if !output.contains_key(key) {
                     output.insert(key.clone(), value.clone());
                 }
             }
@@ -143,7 +157,7 @@ fn apply_animation_outputs_to_entity(
     binder: &HashMap<String, EntityId>,
     outputs: &HashMap<AnimationOutputKey, AnimationOutput>,
 ) {
-    for (key, value) in outputs.into_iter() {
+    for (key, value) in outputs.iter() {
         let target = match &key.target {
             AnimationTarget::BinderId(id) => match binder.get(id) {
                 Some(id) => *id,
@@ -190,7 +204,7 @@ pub fn animation_player_systems() -> SystemGroup {
                 for (id, url) in q.collect_cloned(world, qs) {
                     let async_run = world.resource(async_run()).clone();
                     let assets = world.resource(asset_cache()).clone();
-                    let url = match TypedAssetUrl::<AnimationAssetType>::parse(url) {
+                    let url = match TypedAssetUrl::<AnimationAssetType>::from_str(&url) {
                         Ok(val) => val,
                         Err(_) => {
                             world.add_component(id, clip_duration(), 0.).ok();
@@ -200,7 +214,7 @@ pub fn animation_player_systems() -> SystemGroup {
                     let retarget_model = world
                         .get_cloned(id, retarget_model_from_url())
                         .ok()
-                        .and_then(|x| TypedAssetUrl::parse(x).ok());
+                        .and_then(|x| TypedAssetUrl::from_str(&x).ok());
                     let retarget_animation_scaled = world.get(id, retarget_animation_scaled()).ok();
 
                     let retargeting = if retarget_model.is_some() {
@@ -216,7 +230,7 @@ pub fn animation_player_systems() -> SystemGroup {
                         let clip = AnimationClipRetargetedFromModel {
                             clip: url,
                             translation_retargeting: retargeting,
-                            retarget_model: retarget_model,
+                            retarget_model,
                         }
                         .get(&assets)
                         .await;
@@ -262,19 +276,21 @@ pub fn animation_player_systems() -> SystemGroup {
                         for (i, bind_id) in bind_ids.iter().enumerate() {
                             mask_map.insert(
                                 bind_id.clone(),
-                                mask_weights.get(i).map(|x| *x).unwrap_or(0.),
+                                mask_weights.get(i).copied().unwrap_or(0.),
                             );
                         }
                         world.add_component(id, mask(), mask_map).ok();
                     }
                 }),
             query((animation_player(), children())).to_system(|q, world, qs, _| {
-                let time = world.resource(abs_time()).clone();
+                let time = *world.resource(epoch_time());
                 for (id, (_, children)) in q.collect_cloned(world, qs) {
                     let mut errors = Default::default();
                     let output = sample_animation_node(world, children[0], time, &mut errors);
-                    world.add_component(id, animation_output(), output).ok();
-                    if errors.len() > 0 {
+                    world
+                        .add_component(id, animation_output(), AnimationOutputs(output))
+                        .ok();
+                    if !errors.is_empty() {
                         world.add_component(id, animation_errors(), errors).ok();
                     } else if world.has_component(id, animation_errors()) {
                         world.remove_component(id, animation_errors()).ok();
@@ -284,7 +300,7 @@ pub fn animation_player_systems() -> SystemGroup {
             query((apply_animation_player(), animation_binder())).to_system(|q, world, qs, _| {
                 for (_, (anim_player_id, binder)) in q.iter(world, qs) {
                     if let Ok(outputs) = world.get_ref(*anim_player_id, animation_output()) {
-                        apply_animation_outputs_to_entity(world, binder, outputs);
+                        apply_animation_outputs_to_entity(world, binder, &outputs.0);
                     }
                 }
             }),
@@ -296,7 +312,7 @@ fn build_base_pose(
     assets: &AssetCache,
     clip_url: &str,
 ) -> anyhow::Result<HashMap<AnimationOutputKey, AnimationOutput>> {
-    let clip_url = TypedAssetUrl::<AnimationAssetType>::parse(clip_url)?;
+    let clip_url = TypedAssetUrl::<AnimationAssetType>::from_str(clip_url)?;
     let model_url = clip_url
         .model_crate()
         .context("Failed to get model crate")?
@@ -307,7 +323,7 @@ fn build_base_pose(
             .into_iter()
             .flat_map(|(bind_id, entity)| {
                 entity.into_iter().map(move |entry| {
-                    let desc: ComponentDesc = (*entry).clone();
+                    let desc: ComponentDesc = *entry;
                     let output = if let Some(value) = entry.try_downcast_ref::<Vec3>() {
                         AnimationOutput::Vec3 {
                             component: desc.try_into().unwrap(),

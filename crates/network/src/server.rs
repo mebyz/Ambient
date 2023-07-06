@@ -1,13 +1,13 @@
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
-    client::{ClientConnection, DynRecv, DynSend},
-    proto::server::Player,
-    NetworkError, RPC_BISTREAM_ID,
+    client::ClientConnection, proto::server::Player, DynRecv, DynSend, NetworkError,
+    RPC_BISTREAM_ID,
 };
 use ambient_core::{
-    name,
+    app_start_time, name,
     player::{get_by_user_id, player},
+    FIXED_SERVER_TICK_TIME,
 };
 use ambient_ecs::{
     components, dont_store, query, ArchetypeFilter, Entity, EntityId, FrameEvent, Networked,
@@ -17,7 +17,7 @@ use ambient_rpc::RpcRegistry;
 use ambient_std::{
     asset_cache::AssetCache, asset_url::AbsAssetUrl, fps_counter::FpsSample, log_result,
 };
-use ambient_sys::time::SystemTime;
+use ambient_sys::time::Instant;
 use bytes::Bytes;
 use flume::Sender;
 use parking_lot::Mutex;
@@ -103,7 +103,7 @@ pub fn register_rpc_bi_stream_handler(
                 let state = state;
                 let user_id = user_id.to_string();
                 let rpc_registry = rpc_registry.clone();
-                tokio::spawn(async move {
+                ambient_sys::task::spawn(async move {
                     let try_block = || async {
                         let mut buf = Vec::new();
                         recv.take(1024 * 1024 * 1024).read_to_end(&mut buf).await?;
@@ -139,18 +139,26 @@ impl WorldInstance {
         let msg: Bytes = bincode::serialize(&diff).unwrap().into();
 
         ambient_profiling::scope!("Send MsgEntities");
+
         for (_, (entity_stream,)) in query((player_entity_stream(),)).iter(&self.world, None) {
-            if let Err(_err) = entity_stream.send(msg.clone()) {
-                log::warn!("Failed to broadcast diff to player");
+            if let Err(err) = entity_stream.send(msg.clone()) {
+                log::warn!("Failed to broadcast diff to player: {err:?}");
             }
         }
     }
     pub fn player_count(&self) -> usize {
         query((player(),)).iter(&self.world, None).count()
     }
-    pub fn step(&mut self, time: Duration) {
+    pub fn step(&mut self, frame_time: Instant, delta_time: Duration) {
         self.world
-            .set(self.world.resource_entity(), ambient_core::abs_time(), time)
+            .set_components(
+                self.world.resource_entity(),
+                ambient_core::time_resources_frame(
+                    frame_time,
+                    *self.world.resource(app_start_time()),
+                    delta_time,
+                ),
+            )
             .unwrap();
         self.systems.run(&mut self.world, &FrameEvent);
         self.world.next_frame();
@@ -209,11 +217,8 @@ impl ServerState {
     }
 
     pub fn step(&mut self) {
-        let time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
         for instance in self.instances.values_mut() {
-            instance.step(time);
+            instance.step(Instant::now(), FIXED_SERVER_TICK_TIME);
         }
     }
     pub fn broadcast_diffs(&mut self) {

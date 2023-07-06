@@ -4,13 +4,9 @@
 
 use std::sync::Arc;
 
-use ambient_audio::AudioFromUrl;
 use ambient_core::{
-    asset_cache,
-    async_ecs::async_run,
     gpu,
     player::local_user_id,
-    runtime,
     window::{window_ctl, WindowCtl},
 };
 use ambient_gpu::texture::Texture;
@@ -21,8 +17,8 @@ use ambient_procedurals::{
     procedural_storage,
 };
 use ambient_renderer::pbr_material::{PbrMaterialConfig, PbrMaterialParams};
-use ambient_std::{asset_cache::AsyncAssetKeyExt, asset_url::AbsAssetUrl, mesh::MeshBuilder};
-use ambient_world_audio::{audio_sender, AudioMessage};
+use ambient_std::mesh::MeshBuilder;
+
 use anyhow::Context;
 use glam::Vec4;
 use wgpu::TextureViewDescriptor;
@@ -38,8 +34,9 @@ use crate::shared::{
 
 use ambient_core::camera::{clip_position_to_world_ray, world_to_clip_space};
 
+#[async_trait::async_trait]
 impl wit::client_message::Host for Bindings {
-    fn send(
+    async fn send(
         &mut self,
         target: wit::client_message::Target,
         name: String,
@@ -81,8 +78,9 @@ impl wit::client_message::Host for Bindings {
         }
     }
 }
+#[async_trait::async_trait]
 impl wit::client_player::Host for Bindings {
-    fn get_local(&mut self) -> anyhow::Result<wit::types::EntityId> {
+    async fn get_local(&mut self) -> anyhow::Result<wit::types::EntityId> {
         crate::shared::implementation::player::get_by_user_id(
             self.world(),
             self.world().resource(local_user_id()).clone(),
@@ -91,8 +89,9 @@ impl wit::client_player::Host for Bindings {
         .unwrap()
     }
 }
+#[async_trait::async_trait]
 impl wit::client_input::Host for Bindings {
-    fn get(&mut self) -> anyhow::Result<wit::client_input::Input> {
+    async fn get(&mut self) -> anyhow::Result<wit::client_input::Input> {
         Ok(self
             .world()
             .resource(player_raw_input())
@@ -100,7 +99,7 @@ impl wit::client_input::Host for Bindings {
             .into_bindgen())
     }
 
-    fn get_previous(&mut self) -> anyhow::Result<wit::client_input::Input> {
+    async fn get_previous(&mut self) -> anyhow::Result<wit::client_input::Input> {
         Ok(self
             .world()
             .resource(player_prev_raw_input())
@@ -108,7 +107,7 @@ impl wit::client_input::Host for Bindings {
             .into_bindgen())
     }
 
-    fn set_cursor(&mut self, icon: wit::client_input::CursorIcon) -> anyhow::Result<()> {
+    async fn set_cursor(&mut self, icon: wit::client_input::CursorIcon) -> anyhow::Result<()> {
         Ok(self
             .world()
             .resource(ambient_core::window::window_ctl())
@@ -117,14 +116,14 @@ impl wit::client_input::Host for Bindings {
             ))?)
     }
 
-    fn set_cursor_visible(&mut self, visible: bool) -> anyhow::Result<()> {
+    async fn set_cursor_visible(&mut self, visible: bool) -> anyhow::Result<()> {
         Ok(self
             .world()
             .resource(ambient_core::window::window_ctl())
             .send(ambient_core::window::WindowCtl::ShowCursor(visible))?)
     }
 
-    fn set_cursor_lock(&mut self, lock: bool) -> anyhow::Result<()> {
+    async fn set_cursor_lock(&mut self, lock: bool) -> anyhow::Result<()> {
         let grab_mode = if lock {
             if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
                 CursorGrabMode::Confined
@@ -143,8 +142,9 @@ impl wit::client_input::Host for Bindings {
             .send(ambient_core::window::WindowCtl::GrabCursor(grab_mode))?)
     }
 }
+#[async_trait::async_trait]
 impl wit::client_camera::Host for Bindings {
-    fn clip_position_to_world_ray(
+    async fn clip_position_to_world_ray(
         &mut self,
         camera: wit::types::EntityId,
         clip_space_pos: wit::types::Vec2,
@@ -158,7 +158,7 @@ impl wit::client_camera::Host for Bindings {
         Ok(ray.into_bindgen())
     }
 
-    fn screen_to_clip_space(
+    async fn screen_to_clip_space(
         &mut self,
         screen_pos: wit::types::Vec2,
     ) -> anyhow::Result<wit::types::Vec2> {
@@ -168,7 +168,7 @@ impl wit::client_camera::Host for Bindings {
         )
     }
 
-    fn screen_position_to_world_ray(
+    async fn screen_position_to_world_ray(
         &mut self,
         camera: wit::types::EntityId,
         screen_pos: wit::types::Vec2,
@@ -180,7 +180,7 @@ impl wit::client_camera::Host for Bindings {
         Ok(ray.into_bindgen())
     }
 
-    fn world_to_screen(
+    async fn world_to_screen(
         &mut self,
         camera: wit::types::EntityId,
         world_pos: wit::types::Vec3,
@@ -193,95 +193,19 @@ impl wit::client_camera::Host for Bindings {
         Ok(ambient_core::window::clip_to_screen_space(self.world(), clip_pos).into_bindgen())
     }
 }
-impl wit::client_audio::Host for Bindings {
-    fn load(&mut self, url: String) -> anyhow::Result<()> {
-        let world = self.world();
-        let assets = world.resource(asset_cache());
-        let audio_url = AudioFromUrl {
-            url: AbsAssetUrl::parse(url)?,
-        };
-        let _track = audio_url.peek(assets);
-        Ok(())
-    }
 
-    fn play(&mut self, url: String, looping: bool, volume: f32, uid: u32) -> anyhow::Result<()> {
-        let world = self.world();
-        let assets = world.resource(asset_cache()).clone();
-        let runtime = world.resource(runtime()).clone();
-        let async_run = world.resource(async_run()).clone();
-        let url = AbsAssetUrl::parse(url)?.to_download_url(&assets)?;
-        runtime.spawn(async move {
-            let track = AudioFromUrl { url: url.clone() }.get(&assets).await;
-            async_run.run(move |world| {
-                match track {
-                    Ok(track) => {
-                        let sender = world.resource(audio_sender());
-                        sender
-                            .send(AudioMessage::Track(track, looping, volume, url, uid))
-                            .unwrap();
-                    }
-                    Err(e) => log::error!("{e:?}"),
-                };
-            });
-        });
-        Ok(())
-    }
-
-    fn stop(&mut self, url: String) -> anyhow::Result<()> {
-        let world = self.world();
-        let runtime = world.resource(runtime()).clone();
-        let async_run = world.resource(async_run()).clone();
-        let assets = world.resource(asset_cache());
-        let url = AbsAssetUrl::parse(url)?.to_download_url(assets)?;
-        runtime.spawn(async move {
-            async_run.run(move |world| {
-                let sender = world.resource(audio_sender());
-                sender.send(AudioMessage::Stop(url)).unwrap();
-            });
-        });
-        Ok(())
-    }
-
-    fn set_volume(&mut self, url: String, volume: f32) -> anyhow::Result<()> {
-        let world = self.world();
-        let runtime = world.resource(runtime()).clone();
-        let async_run = world.resource(async_run()).clone();
-        let assets = world.resource(asset_cache());
-        let url = AbsAssetUrl::parse(url)?.to_download_url(assets)?;
-        runtime.spawn(async move {
-            async_run.run(move |world| {
-                let sender = world.resource(audio_sender());
-                sender
-                    .send(AudioMessage::UpdateVolume(url, volume))
-                    .unwrap();
-            });
-        });
-        Ok(())
-    }
-
-    fn stop_by_id(&mut self, uid: u32) -> anyhow::Result<()> {
-        let world = self.world();
-        let runtime = world.resource(runtime()).clone();
-        let async_run = world.resource(async_run()).clone();
-        runtime.spawn(async move {
-            async_run.run(move |world| {
-                let sender = world.resource(audio_sender());
-                sender.send(AudioMessage::StopById(uid)).unwrap();
-            });
-        });
-        Ok(())
-    }
-}
+#[async_trait::async_trait]
 impl wit::client_window::Host for Bindings {
-    fn set_fullscreen(&mut self, fullscreen: bool) -> anyhow::Result<()> {
+    async fn set_fullscreen(&mut self, fullscreen: bool) -> anyhow::Result<()> {
         self.world_mut()
             .resource(window_ctl())
             .send(WindowCtl::SetFullscreen(fullscreen))?;
         Ok(())
     }
 }
+#[async_trait::async_trait]
 impl wit::client_mesh::Host for Bindings {
-    fn create(
+    async fn create(
         &mut self,
         desc: wit::client_mesh::Descriptor,
     ) -> anyhow::Result<wit::client_mesh::Handle> {
@@ -312,15 +236,16 @@ impl wit::client_mesh::Host for Bindings {
         storage.meshes.insert(mesh_handle, mesh);
         Ok(mesh_handle.into_bindgen())
     }
-    fn destroy(&mut self, handle: wit::client_mesh::Handle) -> anyhow::Result<()> {
+    async fn destroy(&mut self, handle: wit::client_mesh::Handle) -> anyhow::Result<()> {
         let world = self.world_mut();
         let storage = world.resource_mut(procedural_storage());
         storage.meshes.remove(handle.from_bindgen());
         Ok(())
     }
 }
+#[async_trait::async_trait]
 impl wit::client_texture::Host for Bindings {
-    fn create2d(
+    async fn create2d(
         &mut self,
         desc: wit::client_texture::Descriptor2d,
     ) -> anyhow::Result<wit::client_texture::Handle> {
@@ -351,15 +276,16 @@ impl wit::client_texture::Host for Bindings {
         storage.textures.insert(texture_handle, texture_view);
         Ok(texture_handle.into_bindgen())
     }
-    fn destroy(&mut self, handle: wit::client_texture::Handle) -> anyhow::Result<()> {
+    async fn destroy(&mut self, handle: wit::client_texture::Handle) -> anyhow::Result<()> {
         let world = self.world_mut();
         let storage = world.resource_mut(procedural_storage());
         storage.textures.remove(handle.from_bindgen());
         Ok(())
     }
 }
+#[async_trait::async_trait]
 impl wit::client_sampler::Host for Bindings {
-    fn create(
+    async fn create(
         &mut self,
         desc: wit::client_sampler::Descriptor,
     ) -> anyhow::Result<wit::client_sampler::Handle> {
@@ -380,15 +306,16 @@ impl wit::client_sampler::Host for Bindings {
         storage.samplers.insert(sampler_handle, sampler);
         Ok(sampler_handle.into_bindgen())
     }
-    fn destroy(&mut self, handle: wit::client_sampler::Handle) -> anyhow::Result<()> {
+    async fn destroy(&mut self, handle: wit::client_sampler::Handle) -> anyhow::Result<()> {
         let world = self.world_mut();
         let storage = world.resource_mut(procedural_storage());
         storage.samplers.remove(handle.from_bindgen());
         Ok(())
     }
 }
+#[async_trait::async_trait]
 impl wit::client_material::Host for Bindings {
-    fn create(
+    async fn create(
         &mut self,
         desc: wit::client_material::Descriptor,
     ) -> anyhow::Result<wit::client_material::Handle> {
@@ -421,7 +348,7 @@ impl wit::client_material::Host for Bindings {
         storage.materials.insert(material_handle, material);
         Ok(material_handle.into_bindgen())
     }
-    fn destroy(&mut self, handle: wit::client_material::Handle) -> anyhow::Result<()> {
+    async fn destroy(&mut self, handle: wit::client_material::Handle) -> anyhow::Result<()> {
         let world = self.world_mut();
         let storage = world.resource_mut(procedural_storage());
         storage.materials.remove(handle.from_bindgen());

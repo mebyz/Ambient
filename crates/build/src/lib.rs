@@ -1,6 +1,9 @@
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use ambient_asset_cache::{AssetCache, SyncAssetKeyExt};
@@ -13,6 +16,7 @@ use itertools::Itertools;
 use pipelines::{FileCollection, ProcessCtx, ProcessCtxKey};
 use walkdir::WalkDir;
 
+pub mod migrate;
 pub mod pipelines;
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -36,6 +40,11 @@ impl Metadata {
     }
 }
 
+pub fn register_from_manifest(manifest: &ProjectManifest) {
+    ambient_ecs::ComponentRegistry::get_mut()
+        .add_external(ambient_project_native::all_defined_components(manifest, false).unwrap());
+}
+
 /// This takes the path to an Ambient project and builds it. An Ambient project is expected to
 /// have the following structure:
 ///
@@ -50,20 +59,16 @@ pub async fn build(
     manifest: &ProjectManifest,
     optimize: bool,
     clean_build: bool,
-) -> Metadata {
-    tracing::info!(
-        ?path,
-        "Building project `{}` ({})",
-        manifest.project.id,
-        manifest
-            .project
-            .name
-            .as_deref()
-            .unwrap_or_else(|| manifest.project.id.as_ref())
-    );
+) -> anyhow::Result<Metadata> {
+    let name = manifest
+        .ember
+        .name
+        .as_deref()
+        .unwrap_or_else(|| manifest.ember.id.as_ref());
 
-    ambient_ecs::ComponentRegistry::get_mut()
-        .add_external(ambient_project_native::all_defined_components(manifest, false).unwrap());
+    tracing::info!("Building project `{}` ({})", manifest.ember.id, name);
+
+    register_from_manifest(manifest);
 
     let build_path = path.join("build");
     let assets_path = path.join("assets");
@@ -78,28 +83,36 @@ pub async fn build(
 
     tokio::fs::create_dir_all(&build_path)
         .await
-        .context("Failed to create build directory")
-        .unwrap();
+        .context("Failed to create build directory")?;
 
-    build_assets(physics, &assets_path, &build_path).await;
+    build_assets(physics, &assets_path, &build_path).await?;
 
     build_rust_if_available(&path, manifest, &build_path, optimize)
         .await
-        .unwrap();
+        .with_context(|| format!("Failed to build rust {build_path:?}"))?;
 
-    store_manifest(manifest, &build_path).await.unwrap();
-    store_metadata(&build_path).await.unwrap()
+    store_manifest(manifest, &build_path).await?;
+    store_metadata(&build_path).await
 }
 
-async fn build_assets(physics: Physics, assets_path: &Path, build_path: &Path) {
-    let files = WalkDir::new(assets_path)
+fn get_asset_files(assets_path: &Path) -> impl Iterator<Item = PathBuf> {
+    WalkDir::new(assets_path)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.metadata().map(|x| x.is_file()).unwrap_or(false))
-        .map(|x| AbsAssetUrl::from_file_path(x.into_path()))
-        .collect_vec();
+        .map(|x| x.into_path())
+}
+
+async fn build_assets(
+    physics: Physics,
+    assets_path: &Path,
+    build_path: &Path,
+) -> anyhow::Result<()> {
+    let files = get_asset_files(assets_path).map(Into::into).collect_vec();
 
     let assets = AssetCache::new_with_config(tokio::runtime::Handle::current(), None);
+
+    let has_errored = Arc::new(AtomicBool::new(false));
 
     PhysicsKey.insert(&assets, physics);
     let ctx = ProcessCtx {
@@ -125,14 +138,27 @@ async fn build_assets(physics: Physics, assets_path: &Path, build_path: &Path) {
             log::info!("{}", msg);
             async {}.boxed()
         }),
-        on_error: Arc::new(|err| {
-            log::error!("{:?}", err);
-            async {}.boxed()
+        on_error: Arc::new({
+            let has_errored = has_errored.clone();
+            move |err| {
+                log::error!("{:?}", err);
+                has_errored.store(true, Ordering::SeqCst);
+                async {}.boxed()
+            }
         }),
     };
 
     ProcessCtxKey.insert(&ctx.assets, ctx.clone());
-    pipelines::process_pipelines(&ctx).await;
+
+    pipelines::process_pipelines(&ctx)
+        .await
+        .with_context(|| format!("Failed to process pipelines for {assets_path:?}"))?;
+
+    if has_errored.load(Ordering::SeqCst) {
+        anyhow::bail!("Failed to build assets");
+    }
+
+    Ok(())
 }
 
 async fn build_rust_if_available(
@@ -148,17 +174,17 @@ async fn build_rust_if_available(
 
     let toml = cargo_toml::Manifest::from_str(&tokio::fs::read_to_string(&cargo_toml_path).await?)?;
     match toml.package {
-        Some(package) if package.name == manifest.project.id.as_ref() => {}
+        Some(package) if package.name == manifest.ember.id.as_ref() => {}
         Some(package) => {
             anyhow::bail!(
                 "The name of the package in the Cargo.toml ({}) does not match the project's ID ({})",
                 package.name,
-                manifest.project.id
+                manifest.ember.id
             );
         }
         None => anyhow::bail!(
             "No [package] present in Cargo.toml for project {}",
-            manifest.project.id.as_ref()
+            manifest.ember.id.as_ref()
         ),
     }
 
@@ -167,7 +193,7 @@ async fn build_rust_if_available(
     for feature in &manifest.build.rust.feature_multibuild {
         for (path, bytecode) in rustc.build(
             project_path,
-            manifest.project.id.as_ref(),
+            manifest.ember.id.as_ref(),
             optimize,
             &[feature],
         )? {

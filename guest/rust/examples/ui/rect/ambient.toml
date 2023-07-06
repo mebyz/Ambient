@@ -1,4 +1,7 @@
-[project]
-id = "rect"
+[ember]
+id = "ambient_example_rect"
 name = "Rect"
 version = "0.0.1"
+repository = "https://github.com/AmbientRun/Ambient/tree/main/guest/rust/examples/ui/rect"
+type = "Game"
+categories = ["Example"]
