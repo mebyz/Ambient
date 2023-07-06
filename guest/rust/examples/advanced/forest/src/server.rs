@@ -5,11 +5,11 @@ use ambient_api::{
         ecs::{children, parent},
         physics::{
             character_controller_height, character_controller_radius, physics_controlled,
-            plane_collider, sphere_collider,
+            sphere_collider,
         },
         player::{player, user_id},
-        primitives::{cube, quad},
-        rendering::{color, sky, water},
+        primitives::{cube},
+        rendering::{color, sky, water, fog_density, transparency_group},
         transform::{local_to_parent, rotation, scale, translation},
     },
     concepts::{make_perspective_infinite_reverse_camera, make_transformable, make_sphere,},
@@ -144,7 +144,7 @@ pub fn main() {
             }
 
             //entity::set_component(player_id, translation(), pos);
-            physics::move_character(player_id, displace, 0.01, frametime());
+            physics::move_character(player_id, displace, 0.01, delta_time());
         }
     });
 }

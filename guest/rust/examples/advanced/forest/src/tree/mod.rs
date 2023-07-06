@@ -1,6 +1,5 @@
 use ambient_api::{client::mesh, mesh::Vertex, prelude::*};
 use serde::{Deserialize, Serialize};
-use serde_json::Result;
 
 #[path = "../tooling/mod.rs"]
 mod tooling;

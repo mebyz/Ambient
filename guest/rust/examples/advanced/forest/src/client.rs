@@ -1,6 +1,11 @@
 use ambient_api::{
     client::{material, mesh, sampler, texture},
     components::core::{
+        text::text, rendering::light_diffuse, rendering::sun,
+        rendering::pbr_material_from_url, rendering::color,
+        transform::translation,transform::lookat_target,transform::rotation,transform::scale,
+        transform::mesh_to_world,transform::mesh_to_local,transform::local_to_world,
+        app::main_scene,app::name,
         camera::aspect_ratio_from_window,
         procedurals::{procedural_material, procedural_mesh},
     },
@@ -85,7 +90,7 @@ fn make_lighting() {
                 entity::set_component(
                     sun_id,
                     rotation(),
-                    Quat::from_rotation_z(frametime() / 10.0) * sun_rotation,
+                    Quat::from_rotation_z(delta_time() / 10.0) * sun_rotation,
                 );
             }
         });
