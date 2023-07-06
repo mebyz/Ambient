@@ -1,7 +1,7 @@
 use ambient_api::{
     client::{material, mesh, sampler, texture},
     components::core::{
-        text::text, rendering::light_diffuse, rendering::sun,
+        text::text, rendering::light_diffuse, rendering::sun, rendering::transparency_group, rendering::fog_density,
         rendering::pbr_material_from_url, rendering::color,
         transform::translation,transform::lookat_target,transform::rotation,transform::scale,
         transform::mesh_to_world,transform::mesh_to_local,transform::local_to_world,
